@@ -16,7 +16,6 @@
 
   <!-- ECRÃ DE LOBBY (TEMA FRIO / GLACIAL) -->
   <div id="lobby-screen" class="screen active">
-    <!-- Camada de neve/cristais de gelo animada (CSS puro) -->
     <div class="snow-layer" aria-hidden="true">
       <span class="flake f1">❄</span>
       <span class="flake f2">•</span>
@@ -94,7 +93,6 @@
         <!-- DEALER FIXA NO TOPO DA MESA -->
         <div class="dealer-seat">
           <div class="dealer-avatar-wrap">
-            <!-- Ilustração SVG da Dealer (sem imagens externas) -->
             <svg viewBox="0 0 100 100" class="dealer-svg" aria-label="Dealer">
               <defs>
                 <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
@@ -103,22 +101,15 @@
                 </linearGradient>
               </defs>
               <circle cx="50" cy="50" r="48" fill="url(#bgGrad)"/>
-              <!-- Cabelo -->
               <path d="M26 48 C24 22, 76 22, 74 48 C76 62, 68 68, 64 62 L36 62 C32 68, 24 62, 26 48 Z" fill="#d97706"/>
-              <!-- Ombros / Camisa Branca -->
               <path d="M18 96 C22 72, 36 66, 50 66 C64 66, 78 72, 82 96 Z" fill="#f8fafc"/>
-              <!-- Colete de Croupier -->
               <path d="M31 69 L50 86 L69 69 L74 96 L26 96 Z" fill="#4c1d95"/>
-              <!-- Laço / Gravata Borboleta -->
               <polygon points="43,69 50,73 43,77" fill="#f5b942"/>
               <polygon points="57,69 50,73 57,77" fill="#f5b942"/>
               <circle cx="50" cy="73" r="2.2" fill="#eab308"/>
-              <!-- Pescoço e Rosto -->
               <rect x="44" y="56" width="12" height="12" rx="4" fill="#fde2c4"/>
               <ellipse cx="50" cy="43" rx="16" ry="18" fill="#fde2c4"/>
-              <!-- Franja -->
               <path d="M34 38 C38 26, 62 26, 66 38 C60 31, 42 31, 34 38 Z" fill="#b45309"/>
-              <!-- Olhos e Sorriso -->
               <circle cx="44" cy="43" r="2" fill="#1e293b"/>
               <circle cx="56" cy="43" r="2" fill="#1e293b"/>
               <path d="M44 51 Q50 56 56 51" fill="none" stroke="#be123c" stroke-width="2" stroke-linecap="round"/>
@@ -131,7 +122,7 @@
           <div id="table-message" class="dealer-speech">À espera de jogadores...</div>
         </div>
 
-        <!-- CENTRO DO FELTRO: APENAS POTE E CARTAS COMUNITÁRIAS -->
+        <!-- CENTRO DO FELTRO: POTE, CARTAS COMUNITÁRIAS E BANNER DA MÃO VENCEDORA -->
         <div class="table-center">
           <div class="pot-zone">
             <div id="pot-chips" class="pot-chips"></div>
@@ -142,6 +133,7 @@
           </div>
 
           <div id="community-cards" class="community-cards"></div>
+          <div id="winning-hand-banner" class="winning-hand-banner hidden"></div>
         </div>
 
         <!-- 6 LUGARES SIMÉTRICOS EM VOLTA DA MESA -->
