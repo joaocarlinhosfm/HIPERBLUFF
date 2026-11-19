@@ -184,6 +184,7 @@ const BIG_BLIND = 20;
 
 const TURN_DURATION_MS = 20000;
 const NEXT_HAND_DELAY_MS = 6000;
+const AUTO_START_DELAY_MS = 10000; // 10 segundos após entrar o 2.º jogador
 
 function createDeck() {
   const deck = [];
@@ -329,9 +330,9 @@ function createInitialRoom(hostId, hostName) {
     lastEvent: null,
     deck: [],
     community: [],
-    message: "À espera de jogadores (mín. 2, máx. 6)...",
+    message: "A aguardar jogadores... Partilha o código da sala!",
     players: [
-      { id: hostId, name: hostName, chips: STARTING_CHIPS, bet: 0, hand: [], folded: false, allIn: false, acted: false, isBot: false }
+      { id: hostId, name: hostName, chips: STARTING_CHIPS, bet: 0, hand: [], folded: false, allIn: false, acted: false, isBot: false, status: "PRONTO" }
     ]
   };
 }
@@ -405,19 +406,43 @@ function tickTimers() {
     }
   }
 
-  // 2. Temporizador Automático para Próxima Mão
+  // 2. Temporizador Automático (Início da Sala após 2.º jogador OU Próxima Mão)
   const nextPill = $("next-hand-countdown");
-  if (roomState.phase === "SHOWDOWN" && roomState.nextHandDeadline > 0) {
+  const isWaitingCountdown =
+    roomState.phase === "WAITING" &&
+    roomState.nextHandDeadline > 0 &&
+    roomState.players &&
+    roomState.players.length >= 2;
+  const isShowdownCountdown =
+    roomState.phase === "SHOWDOWN" &&
+    roomState.nextHandDeadline > 0;
+
+  if ((isWaitingCountdown || isShowdownCountdown) && nextPill) {
     const remainingMs = Math.max(0, roomState.nextHandDeadline - now);
     const secs = Math.ceil(remainingMs / 1000);
-    nextPill.textContent = `Nova mão em ${secs}s`;
+
+    nextPill.textContent = isWaitingCountdown ? `Começa em ${secs}s` : `Nova mão em ${secs}s`;
     nextPill.classList.remove("hidden");
+
+    if (isWaitingCountdown) {
+      const msgEl = $("table-message");
+      if (msgEl) {
+        msgEl.textContent = `Jogadores na mesa (${roomState.players.length}/${MAX_PLAYERS}) — O jogo começa em ${secs}s!`;
+      }
+      if (secs >= 1 && secs <= 3) {
+        const tickKey = `start_${roomState.nextHandDeadline}_${secs}`;
+        if (lastTickKey !== tickKey) {
+          lastTickKey = tickKey;
+          SoundEngine.tick(secs === 1);
+        }
+      }
+    }
 
     if (remainingMs === 0 && isHost && lastHandledNextHandDeadline !== roomState.nextHandDeadline) {
       lastHandledNextHandDeadline = roomState.nextHandDeadline;
       startNewHand();
     }
-  } else {
+  } else if (nextPill) {
     nextPill.classList.add("hidden");
   }
 }
@@ -725,26 +750,30 @@ function renderGame() {
     SoundEngine.playEvent(roomState.lastEvent.type);
   }
 
+  const players = roomState.players || [];
+  const community = roomState.community || [];
+
   $("display-room-code").textContent = currentRoomCode || "DEMO";
-  $("display-phase").textContent = roomState.phase;
+  $("display-phase").textContent = roomState.phase === "WAITING" ? "A AGUARDAR" : roomState.phase;
   $("pot-amount").textContent = roomState.pot;
   $("pot-chips").innerHTML = renderPotChipsHTML(roomState.pot);
   $("table-message").textContent = roomState.message;
 
   const isHost = roomState.hostId === myId;
-  const canStart = isHost && (roomState.phase === "WAITING" || roomState.phase === "SHOWDOWN");
+  const hasEnoughPlayers = players.length >= 2;
+  const canStart = isHost && hasEnoughPlayers && (roomState.phase === "WAITING" || roomState.phase === "SHOWDOWN");
   $("btn-start-game").classList.toggle("hidden", !canStart);
-  $("btn-start-game").textContent = roomState.phase === "SHOWDOWN" ? "Saltar Espera" : "Iniciar Mão";
+  $("btn-start-game").textContent = roomState.phase === "SHOWDOWN" ? "Saltar Espera" : "Começar Já";
 
-  $("community-cards").innerHTML = roomState.community.map(c => renderCardHTML(c)).join("");
+  $("community-cards").innerHTML = community.map(c => renderCardHTML(c)).join("");
 
-  const myIndex = roomState.players.findIndex(p => p.id === myId);
+  const myIndex = players.findIndex(p => p.id === myId);
   const offset = myIndex >= 0 ? myIndex : 0;
 
   for (let seatVisual = 0; seatVisual < MAX_PLAYERS; seatVisual++) {
     const el = document.querySelector(`.seat-${seatVisual}`);
     const pIdx = (seatVisual + offset) % MAX_PLAYERS;
-    const p = roomState.players[pIdx];
+    const p = players[pIdx];
 
     if (!p) {
       el.className = `seat seat-${seatVisual} empty`;
@@ -763,7 +792,7 @@ function renderGame() {
 
     el.innerHTML = `
       <div class="seat-cards">${cardsHTML}</div>
-      ${roomState.dealerIndex === pIdx ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+      ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
       <div class="seat-box">
         <div class="seat-header">
           <div class="seat-name">${p.name}${isMe ? " (Tu)" : ""}</div>
@@ -777,9 +806,9 @@ function renderGame() {
     `;
   }
 
-  const me = roomState.players[myIndex];
+  const me = players[myIndex];
   if (me && me.hand && me.hand.length === 2) {
-    const allCards = [...me.hand, ...roomState.community];
+    const allCards = [...me.hand, ...community];
     const evalText = allCards.length >= 5 ? evaluateBestHand(allCards).name : "Pré-Flop";
     $("hand-strength-badge").textContent = `A tua mão: ${evalText}`;
   } else {
@@ -841,9 +870,13 @@ $("btn-create-room").addEventListener("click", async () => {
   currentRoomCode = generateRoomCode();
   const initial = createInitialRoom(myId, myName);
 
+  // Senta imediatamente o criador na mesa enquanto grava no Firebase
+  roomState = initial;
+  openGameScreen();
+  renderGame();
+
   await set(ref(db, `rooms/${currentRoomCode}`), initial);
   subscribeToRoom(currentRoomCode);
-  openGameScreen();
 });
 
 $("btn-join-room").addEventListener("click", async () => {
@@ -860,15 +893,18 @@ $("btn-join-room").addEventListener("click", async () => {
   if (!snap.exists()) return showError("Sala não encontrada.");
 
   const data = snap.val();
-  if (data.players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
+  const players = data.players || [];
+  if (players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
 
   localMode = false;
   currentRoomCode = code;
-  data.players.push({
+  players.push({
     id: myId, name: myName, chips: STARTING_CHIPS, bet: 0,
-    hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false
+    hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false,
+    status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
   });
-  await update(ref(db, `rooms/${code}`), { players: data.players });
+
+  await update(ref(db, `rooms/${code}`), { players });
   subscribeToRoom(code);
   openGameScreen();
 });
@@ -878,6 +914,22 @@ function subscribeToRoom(code) {
   unsubscribeRoom = onValue(ref(db, `rooms/${code}`), (snap) => {
     if (snap.exists()) {
       roomState = snap.val();
+
+      // Se o Host detetar o 2.º jogador na fase WAITING, arranca contagem de 10 segundos
+      const players = roomState.players || [];
+      if (
+        roomState.hostId === myId &&
+        roomState.phase === "WAITING" &&
+        players.length >= 2 &&
+        (!roomState.nextHandDeadline || roomState.nextHandDeadline === 0)
+      ) {
+        const deadline = Date.now() + AUTO_START_DELAY_MS;
+        update(ref(db, `rooms/${code}`), {
+          nextHandDeadline: deadline,
+          message: `Jogadores na mesa (${players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`
+        });
+      }
+
       renderGame();
     }
   });
@@ -937,12 +989,10 @@ const iosModal = $("ios-install-modal");
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 
-// No iPhone (Safari), mostrar o botão se ainda não estiver instalada
 if (isIOS && !isStandalone && installBtn) {
   installBtn.classList.remove("hidden");
 }
 
-// No Android (Chrome/Edge), guardar o evento nativo de instalação
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
