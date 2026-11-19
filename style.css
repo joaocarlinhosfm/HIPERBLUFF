@@ -27,12 +27,21 @@
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
+html,
+body {
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: radial-gradient(circle at 50% 15%, #112a46 0%, #071321 55%, #030912 100%);
   color: var(--text-main);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -40,6 +49,7 @@ body {
   display: none;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
 }
 
 .screen.active {
@@ -339,6 +349,12 @@ input[type="text"]:focus {
   opacity: 0.55;
 }
 
+.btn-icon.active {
+  border-color: var(--ice-cyan);
+  color: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
+
 /* ================= TOP BAR ================= */
 .top-bar {
   display: flex;
@@ -375,6 +391,27 @@ input[type="text"]:focus {
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 1px;
+}
+
+/* ================= AVISO DISCRETO EM MOBILE VERTICAL ================= */
+.rotate-hint {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  background: rgba(14, 165, 233, 0.16);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.32);
+  color: #bae6fd;
+  font-size: 0.74rem;
+  font-weight: 600;
+  z-index: 9;
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+  .rotate-hint:not(.dismissed) {
+    display: flex;
+  }
 }
 
 /* ================= MESA DE POKER HD ================= */
@@ -1085,6 +1122,14 @@ input[type="text"]:focus {
   flex-wrap: wrap;
 }
 
+.action-group-left,
+.action-group-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
 .action-buttons.disabled {
   opacity: 0.4;
   pointer-events: none;
@@ -1235,4 +1280,523 @@ input[type="text"]:focus {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+}
+
+/* ================= MOBILE HORIZONTAL (LANDSCAPE ANDROID / IOS) ================= */
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Lobby em 2 colunas sem necessidade de scroll */
+  #lobby-screen {
+    padding:
+      max(0.5rem, env(safe-area-inset-top))
+      max(1rem, env(safe-area-inset-right))
+      max(0.5rem, env(safe-area-inset-bottom))
+      max(1rem, env(safe-area-inset-left));
+  }
+
+  .lobby-card {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    align-items: center;
+    gap: 1.2rem;
+    max-width: 680px;
+    padding: 0.95rem 1.35rem;
+  }
+
+  .lobby-logo {
+    width: 78px;
+    height: 78px;
+    border-radius: 16px;
+  }
+
+  .brand h1 {
+    font-size: 1.45rem;
+    letter-spacing: 2px;
+  }
+
+  .brand-suit {
+    font-size: 1.15rem;
+  }
+
+  .subtitle {
+    font-size: 0.76rem;
+    margin: 0.2rem 0 0;
+  }
+
+  .form-group {
+    margin-bottom: 0.55rem;
+  }
+
+  .form-group label {
+    font-size: 0.72rem;
+    margin-bottom: 0.2rem;
+  }
+
+  input[type="text"] {
+    padding: 0.48rem 0.75rem;
+    font-size: 0.86rem;
+  }
+
+  .divider {
+    margin: 0.5rem 0;
+    font-size: 0.66rem;
+  }
+
+  .lobby-form-col .btn {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
+  }
+
+  .btn-install {
+    margin-top: 0.45rem;
+  }
+
+  .error-msg {
+    margin-top: 0.35rem;
+    font-size: 0.74rem;
+    min-height: 0.9rem;
+  }
+
+  /* Top Bar compacta com Safe Area */
+  .top-bar {
+    padding:
+      max(0.22rem, env(safe-area-inset-top))
+      max(0.75rem, env(safe-area-inset-right))
+      0.22rem
+      max(0.75rem, env(safe-area-inset-left));
+    min-height: 36px;
+  }
+
+  .top-left,
+  .top-center,
+  .top-right {
+    gap: 0.45rem;
+  }
+
+  .logo-mini {
+    font-size: 0.82rem;
+    letter-spacing: 1px;
+  }
+
+  .badge {
+    font-size: 0.64rem;
+    padding: 0.14rem 0.42rem;
+  }
+
+  .top-center {
+    font-size: 0.76rem;
+  }
+
+  .btn-tiny {
+    padding: 0.16rem 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .btn-icon {
+    padding: 0.26rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .btn-sm {
+    padding: 0.28rem 0.62rem;
+    font-size: 0.74rem;
+  }
+
+  /* Mesa proporcionada para evitar cortes nas cartas superiores e lugares inferiores */
+  .table-area {
+    padding:
+      40px
+      max(52px, env(safe-area-inset-right))
+      30px
+      max(52px, env(safe-area-inset-left));
+  }
+
+  .poker-table {
+    width: min(560px, 68vw);
+    height: min(190px, 46dvh);
+    border-width: 8px;
+    border-radius: 115px;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(245, 185, 66, 0.35),
+      inset 0 0 42px rgba(0, 0, 0, 0.72),
+      0 0 0 3px var(--rail-outer),
+      0 0 0 4.5px rgba(56, 189, 248, 0.22),
+      0 14px 34px rgba(0, 0, 0, 0.8);
+  }
+
+  .table-betting-line {
+    inset: 10px 15px;
+    border-radius: 102px;
+  }
+
+  .table-watermark {
+    bottom: 9%;
+    font-size: 0.62rem;
+    letter-spacing: 3px;
+  }
+
+  /* Dealer SVG compacta no topo */
+  .dealer-seat {
+    top: -10%;
+    transform: translate(-50%, -32%);
+  }
+
+  .dealer-avatar-wrap {
+    width: 44px;
+    height: 44px;
+    border-width: 2px;
+  }
+
+  .dealer-plate {
+    margin-top: -8px;
+    padding: 0.1rem 0.55rem;
+    gap: 0.28rem;
+  }
+
+  .dealer-tag,
+  .next-hand-pill {
+    font-size: 0.56rem;
+  }
+
+  .dealer-speech {
+    margin-top: 3px;
+    font-size: 0.62rem;
+    padding: 0.12rem 0.6rem;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Centro do feltro (Pote + Comunitárias + Banner Vencedor) */
+  .table-center {
+    gap: 0.24rem;
+    margin-top: 0.95rem;
+  }
+
+  .pot-zone {
+    min-height: 20px;
+    gap: 0.45rem;
+  }
+
+  .pot-chips {
+    height: 20px;
+    gap: 3px;
+  }
+
+  .poker-chip {
+    width: 14px;
+    height: 5px;
+    margin-top: -2px;
+  }
+
+  .pot-display {
+    padding: 0.12rem 0.65rem;
+    font-size: 0.76rem;
+  }
+
+  .pot-label {
+    font-size: 0.56rem;
+  }
+
+  .community-cards {
+    gap: 0.34rem;
+    min-height: 56px;
+  }
+
+  .winning-hand-banner {
+    margin-top: 0;
+    padding: 0.14rem 1.25rem;
+    font-size: 0.78rem;
+    letter-spacing: 1.5px;
+  }
+
+  /* Cartas HD proporcionais em horizontal */
+  .card {
+    width: 40px;
+    height: 56px;
+    padding: 2px 3px;
+    border-radius: 6px;
+  }
+
+  .card-corner {
+    width: 11px;
+  }
+
+  .card-rank {
+    font-size: 0.68rem;
+  }
+
+  .card-suit-mini {
+    font-size: 0.52rem;
+  }
+
+  .card-center {
+    font-size: 1.12rem;
+  }
+
+  .card.back {
+    padding: 2px;
+  }
+
+  .card-back-emblem {
+    font-size: 0.8rem;
+  }
+
+  .community-cards .card.card-win {
+    transform: translateY(-4px) scale(1.05);
+  }
+
+  .card.small {
+    width: 26px;
+    height: 36px;
+    padding: 1.5px 2px;
+    border-radius: 4px;
+  }
+
+  .card.small .card-corner {
+    width: 8px;
+  }
+
+  .card.small .card-rank {
+    font-size: 0.5rem;
+  }
+
+  .card.small .card-suit-mini {
+    font-size: 0.4rem;
+  }
+
+  .card.small .card-center {
+    font-size: 0.74rem;
+  }
+
+  .card.small .card-back-emblem {
+    font-size: 0.58rem;
+  }
+
+  .seat-cards .card:first-child {
+    margin-right: -8px;
+  }
+
+  .seat-cards.my-cards {
+    bottom: 56%;
+  }
+
+  .seat-cards.my-cards .card {
+    width: 36px;
+    height: 50px;
+    padding: 2px 3px;
+    border-radius: 6px;
+  }
+
+  .seat-cards.my-cards .card-rank {
+    font-size: 0.62rem;
+  }
+
+  .seat-cards.my-cards .card-suit-mini {
+    font-size: 0.46rem;
+  }
+
+  .seat-cards.my-cards .card-center {
+    font-size: 0.96rem;
+  }
+
+  /* 6 Lugares compactos com cartas sempre atrás do círculo */
+  .seat {
+    width: 72px;
+  }
+
+  .seat-0 { left: 24%; top: 102%; }
+  .seat-1 { left: -6%; top: 53%; }
+  .seat-2 { left: 17%; top: -4%; }
+  .seat-3 { left: 83%; top: -4%; }
+  .seat-4 { left: 106%; top: 53%; }
+  .seat-5 { left: 76%; top: 102%; }
+
+  .seat-0 .seat-bet-zone,
+  .seat-5 .seat-bet-zone {
+    bottom: 118%;
+  }
+
+  .seat-2 .seat-bet-zone,
+  .seat-3 .seat-bet-zone {
+    top: 104%;
+  }
+
+  .seat-1 .seat-bet-zone {
+    left: 104%;
+  }
+
+  .seat-4 .seat-bet-zone {
+    right: 104%;
+  }
+
+  .seat-ring {
+    width: 46px;
+    height: 46px;
+    padding: 2px;
+  }
+
+  .seat.active-turn .seat-ring,
+  .seat.is-winner .seat-ring {
+    padding: 3px;
+  }
+
+  .seat-circle {
+    padding: 3px;
+  }
+
+  .seat-name {
+    font-size: 0.6rem;
+  }
+
+  .seat-you-tag {
+    font-size: 0.46rem;
+    margin-top: 1px;
+  }
+
+  .winner-badge {
+    bottom: -5px;
+    font-size: 0.52rem;
+    padding: 1px 6px;
+  }
+
+  .seat-chips {
+    margin-top: 6px;
+    font-size: 0.6rem;
+    padding: 1px 6px;
+  }
+
+  .seat-status {
+    margin-top: 1px;
+    font-size: 0.5rem;
+    padding: 1px 5px;
+  }
+
+  .dealer-chip {
+    width: 17px;
+    height: 17px;
+    font-size: 0.58rem;
+    top: -3px;
+    right: -3px;
+  }
+
+  .turn-timer-text {
+    font-size: 0.54rem;
+    padding: 0 4px;
+    top: -4px;
+    left: -4px;
+  }
+
+  .bet-pill {
+    font-size: 0.58rem;
+    padding: 1px 6px 1px 4px;
+    gap: 3px;
+  }
+
+  .mini-chip {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* Barra de Controlos Ergonómica para Polegares */
+  .controls-bar {
+    position: relative;
+    padding:
+      0.32rem
+      max(0.75rem, env(safe-area-inset-right))
+      max(0.32rem, env(safe-area-inset-bottom))
+      max(0.75rem, env(safe-area-inset-left));
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  /* Badge da mão flutua no centro livre entre o lugar 0 e o lugar 5 */
+  .hand-strength {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.66rem;
+    background: rgba(7, 19, 33, 0.92);
+    border: 1px solid rgba(245, 185, 66, 0.42);
+    padding: 1px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 8;
+  }
+
+  .action-buttons {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+  }
+
+  .action-group-left,
+  .action-group-right {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  .action-buttons .btn {
+    min-height: 40px;
+    padding: 0.46rem 0.78rem;
+    font-size: 0.8rem;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .btn-fold {
+    min-width: 68px;
+  }
+
+  .btn-call {
+    min-width: 90px;
+  }
+
+  .btn-raise {
+    min-width: 96px;
+  }
+
+  .btn-allin {
+    min-width: 68px;
+  }
+
+  .raise-control {
+    padding: 0.2rem 0.35rem;
+    gap: 0.35rem;
+    border-radius: 10px;
+  }
+
+  #raise-slider {
+    width: 82px;
+    height: 24px;
+  }
+}
+
+/* Ajuste fino extra para ecrãs Android muito baixos (<= 370px altura) */
+@media (orientation: landscape) and (max-height: 370px) {
+  .table-area {
+    padding-top: 34px;
+    padding-bottom: 24px;
+  }
+  .poker-table {
+    height: 44dvh;
+  }
+  .dealer-avatar-wrap {
+    width: 38px;
+    height: 38px;
+  }
+  .seat-ring {
+    width: 42px;
+    height: 42px;
+  }
+  .action-buttons .btn {
+    min-height: 36px;
+    padding: 0.36rem 0.62rem;
+    font-size: 0.74rem;
+  }
+  #raise-slider {
+    width: 68px;
+  }
 }
