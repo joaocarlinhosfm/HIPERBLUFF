@@ -714,7 +714,10 @@ input[type="text"]:focus {
   .dealer-speech {
     font-size: 0.7rem;
   }
-  btn-install {
+}
+
+/* ================= BOTÃO INSTALAR PWA E MODAL IOS ================= */
+.btn-install {
   margin-top: 0.75rem;
   width: 100%;
   background: linear-gradient(135deg, #16a34a, #15803d);
@@ -758,5 +761,4 @@ input[type="text"]:focus {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-}
 }
