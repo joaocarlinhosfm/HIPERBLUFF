@@ -185,6 +185,10 @@ const TURN_DURATION_MS = 20000;
 const NEXT_HAND_DELAY_MS = 6000;
 const AUTO_START_DELAY_MS = 10000;
 
+function cardKey(card) {
+  return card ? `${card.rank}_${card.suit}` : "";
+}
+
 function createDeck() {
   const deck = [];
   for (const s of SUITS) {
@@ -216,7 +220,7 @@ function shuffleDeck(deck) {
 }
 
 /* ============================================================================
-   4. AVALIADOR OFICIAL DE MÃOS (MELHORES 5 DE 7 CARTAS + KICKERS)
+   4. AVALIADOR OFICIAL DE MÃOS (DEVOLVE AS 5 CARTAS VENCEDORAS + KICKERS)
    ============================================================================ */
 function scoreFiveCards(cards) {
   const values = cards.map(c => c.rank).sort((a, b) => b - a);
@@ -271,20 +275,23 @@ function scoreFiveCards(cards) {
   for (let i = 0; i < tiebreakers.length; i++) {
     score += tiebreakers[i] * Math.pow(15, 4 - i);
   }
-  return { score, name: HAND_NAMES[cat] };
+  return { score, name: HAND_NAMES[cat], cards };
 }
 
 function evaluateBestHand(cards) {
-  if (!cards || cards.length < 5) return { score: 0, name: "—" };
-  let best = { score: -1, name: "Carta Alta" };
+  if (!cards || cards.length < 5) return { score: 0, name: "—", bestCards: [] };
+  let best = { score: -1, name: "Carta Alta", bestCards: [] };
   const n = cards.length;
   for (let a = 0; a < n - 4; a++)
     for (let b = a + 1; b < n - 3; b++)
       for (let c = b + 1; c < n - 2; c++)
         for (let d = c + 1; d < n - 1; d++)
           for (let e = d + 1; e < n; e++) {
-            const res = scoreFiveCards([cards[a], cards[b], cards[c], cards[d], cards[e]]);
-            if (res.score > best.score) best = res;
+            const combo = [cards[a], cards[b], cards[c], cards[d], cards[e]];
+            const res = scoreFiveCards(combo);
+            if (res.score > best.score) {
+              best = { score: res.score, name: res.name, bestCards: combo };
+            }
           }
   return best;
 }
@@ -309,6 +316,9 @@ function normalizeRoomState(raw) {
     turnDeadline: Number(raw.turnDeadline) || 0,
     nextHandDeadline: Number(raw.nextHandDeadline) || 0,
     lastEvent: raw.lastEvent || null,
+    winnerIds: Array.isArray(raw.winnerIds) ? raw.winnerIds : Object.values(raw.winnerIds || {}),
+    winningHandName: raw.winningHandName || "",
+    winningCards: Array.isArray(raw.winningCards) ? raw.winningCards : Object.values(raw.winningCards || {}),
     deck: Array.isArray(raw.deck) ? raw.deck : Object.values(raw.deck || {}),
     community: Array.isArray(raw.community) ? raw.community : Object.values(raw.community || {}),
     message: raw.message || "",
@@ -367,6 +377,9 @@ function createInitialRoom(hostId, hostName) {
     turnDeadline: 0,
     nextHandDeadline: 0,
     lastEvent: null,
+    winnerIds: [],
+    winningHandName: "",
+    winningCards: [],
     deck: [],
     community: [],
     message: "A aguardar jogadores... Partilha o código da sala!",
@@ -510,6 +523,9 @@ function startNewHand() {
   s.pot = 0;
   s.phase = "PREFLOP";
   s.nextHandDeadline = 0;
+  s.winnerIds = [];
+  s.winningHandName = "";
+  s.winningCards = [];
 
   let nextDealer = s.dealerIndex % s.players.length;
   for (let i = 1; i <= s.players.length; i++) {
@@ -545,7 +561,6 @@ function startNewHand() {
   const canActAfterBlinds = s.players.filter(p => !p.folded && !p.allIn);
   const firstToAct = nextActiveIndex(s, bbPos);
 
-  // Se alguém ficou logo em All-In nas blinds e ninguém precisa de cobrir aposta, faz run-out
   if (
     firstToAct === -1 ||
     (canActAfterBlinds.length <= 1 && canActAfterBlinds.every(p => p.bet >= s.currentBet))
@@ -581,7 +596,6 @@ function nextActiveIndex(s, fromIdx) {
   return -1;
 }
 
-// Devolve qualquer excesso apostado que nenhum outro jogador na mão conseguiu cobrir
 function refundUncalledBet(s) {
   const active = s.players.filter(p => !p.folded);
   if (active.length < 2) return;
@@ -656,10 +670,12 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
 
   p.acted = true;
 
-  // Verificar se só sobra 1 jogador na mão (todos os outros deram Fold)
   const remaining = s.players.filter(pl => !pl.folded);
   if (remaining.length === 1) {
     remaining[0].chips += s.pot;
+    s.winnerIds = [remaining[0].id];
+    s.winningHandName = `${remaining[0].name} VENCEU`;
+    s.winningCards = [];
     s.message = `${remaining[0].name} recolhe ${s.pot}€!`;
     s.phase = "SHOWDOWN";
     s.turnIndex = -1;
@@ -671,11 +687,9 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     return;
   }
 
-  // Verificar se todos os jogadores que ainda podem agir já responderam à aposta atual
   const canStillAct = s.players.filter(pl => !pl.folded && !pl.allIn);
   const allMatchedAndActed = canStillAct.every(pl => pl.acted && pl.bet === s.currentBet);
 
-  // Só termina a ronda se ninguém mais precisar de agir (incluindo responder a um All-In!)
   const roundDone =
     canStillAct.length === 0 ||
     allMatchedAndActed ||
@@ -755,6 +769,7 @@ function resolveShowdown(s) {
   const contenders = s.players.filter(p => !p.folded);
   let bestScore = -1;
   let winners = [];
+  let winningCardSet = new Set();
 
   for (const p of contenders) {
     const evalRes = evaluateBestHand([...(p.hand || []), ...(s.community || [])]);
@@ -762,8 +777,10 @@ function resolveShowdown(s) {
     if (evalRes.score > bestScore) {
       bestScore = evalRes.score;
       winners = [p];
+      winningCardSet = new Set(evalRes.bestCards.map(cardKey));
     } else if (evalRes.score === bestScore) {
       winners.push(p);
+      evalRes.bestCards.forEach(c => winningCardSet.add(cardKey(c)));
     }
   }
 
@@ -771,6 +788,10 @@ function resolveShowdown(s) {
   const remainder = s.pot - share * winners.length;
   winners.forEach((w, i) => { w.chips += share + (i === 0 ? remainder : 0); });
   const names = winners.map(w => w.name).join(" & ");
+
+  s.winnerIds = winners.map(w => w.id);
+  s.winningHandName = winners[0].status;
+  s.winningCards = [...winningCardSet];
   s.message = `🏆 ${names} venceu ${s.pot}€ (${winners[0].status})!`;
 
   const stillAlive = s.players.filter(pl => pl.chips > 0).length >= 2;
@@ -807,7 +828,7 @@ function maybeTriggerBotTurn() {
 }
 
 /* ============================================================================
-   9. RENDERIZAÇÃO DA INTERFACE E DISPARO DE SONS
+   9. RENDERIZAÇÃO DA INTERFACE, HIGHLIGHT DE VITÓRIA E DISPARO DE SONS
    ============================================================================ */
 function renderPotChipsHTML(amount) {
   if (!amount || amount <= 0) return "";
@@ -833,12 +854,12 @@ function renderPotChipsHTML(amount) {
   return html;
 }
 
-function renderCardHTML(card, hidden = false, small = false) {
+function renderCardHTML(card, hidden = false, small = false, highlightClass = "") {
   const sizeClass = small ? "small" : "";
   if (hidden || !card) return `<div class="card back ${sizeClass}"></div>`;
   const isRed = card.suit === "♥" || card.suit === "♦" ? "red" : "";
   return `
-    <div class="card ${isRed} ${sizeClass}">
+    <div class="card ${isRed} ${sizeClass} ${highlightClass}">
       <div class="card-top">${card.label}${card.suit}</div>
       <div class="card-center">${card.suit}</div>
       <div class="card-bottom">${card.label}${card.suit}</div>
@@ -856,6 +877,10 @@ function renderGame() {
 
   const players = roomState.players || [];
   const community = roomState.community || [];
+  const isShowdown = roomState.phase === "SHOWDOWN";
+  const winCardsSet = new Set(roomState.winningCards || []);
+  const winnerIdsSet = new Set(roomState.winnerIds || []);
+  const hasCardHighlights = isShowdown && winCardsSet.size > 0;
 
   $("display-room-code").textContent = currentRoomCode || "DEMO";
   $("display-phase").textContent = roomState.phase === "WAITING" ? "A AGUARDAR" : roomState.phase;
@@ -865,11 +890,29 @@ function renderGame() {
 
   const isHost = roomState.hostId === myId;
   const hasEnoughPlayers = players.length >= 2;
-  const canStart = isHost && hasEnoughPlayers && (roomState.phase === "WAITING" || roomState.phase === "SHOWDOWN");
+  const canStart = isHost && hasEnoughPlayers && (roomState.phase === "WAITING" || isShowdown);
   $("btn-start-game").classList.toggle("hidden", !canStart);
-  $("btn-start-game").textContent = roomState.phase === "SHOWDOWN" ? "Saltar Espera" : "Começar Já";
+  $("btn-start-game").textContent = isShowdown ? "Saltar Espera" : "Começar Já";
 
-  $("community-cards").innerHTML = community.map(c => renderCardHTML(c)).join("");
+  // Cartas comunitárias com destaque nas cartas da combinação vencedora
+  $("community-cards").innerHTML = community.map(c => {
+    let hl = "";
+    if (hasCardHighlights) {
+      hl = winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
+    }
+    return renderCardHTML(c, false, false, hl);
+  }).join("");
+
+  // Banner central da mão vencedora (ex: FULL HOUSE)
+  const bannerEl = $("winning-hand-banner");
+  if (bannerEl) {
+    if (isShowdown && roomState.winningHandName) {
+      bannerEl.textContent = roomState.winningHandName.toUpperCase();
+      bannerEl.classList.remove("hidden");
+    } else {
+      bannerEl.classList.add("hidden");
+    }
+  }
 
   const myIndex = players.findIndex(p => p.id === myId);
   const offset = myIndex >= 0 ? myIndex : 0;
@@ -893,13 +936,20 @@ function renderGame() {
 
     const isMe = p.id === myId;
     const isTurn = roomState.turnIndex === pIdx;
+    const isWinner = isShowdown && winnerIdsSet.has(p.id);
     const inHand = !p.folded && p.hand && p.hand.length === 2;
-    const showCards = isMe || (roomState.phase === "SHOWDOWN" && !p.folded);
+    const showCards = isMe || (isShowdown && !p.folded && hasCardHighlights);
 
-    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${p.folded ? "folded" : ""}`;
+    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
 
     const cardsHTML = inHand
-      ? `<div class="seat-cards ${isMe ? "my-cards" : "opp-cards"}">${p.hand.map(c => renderCardHTML(c, !showCards, !isMe)).join("")}</div>`
+      ? `<div class="seat-cards ${isMe || isWinner ? "my-cards" : "opp-cards"}">${p.hand.map(c => {
+          let hl = "";
+          if (hasCardHighlights && showCards) {
+            hl = isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
+          }
+          return renderCardHTML(c, !showCards, !(isMe || isWinner), hl);
+        }).join("")}</div>`
       : "";
 
     const betHTML = p.bet > 0 ? `<div class="bet-pill">${p.bet} €</div>` : "";
@@ -916,6 +966,7 @@ function renderGame() {
           <div class="seat-name" title="${p.name}">${p.name}</div>
           ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
         </div>
+        ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
       </div>
       <div class="seat-chips">${p.chips} €</div>
       ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}
@@ -1092,7 +1143,6 @@ $("btn-copy-code").addEventListener("click", () => {
 });
 
 $("btn-leave").addEventListener("click", async () => {
-  // Se estiver online e for a minha vez, faz Fold antes de sair para não bloquear a mesa
   if (!localMode && roomState && roomState.turnIndex >= 0) {
     const active = roomState.players[roomState.turnIndex];
     if (active && active.id === myId) {
