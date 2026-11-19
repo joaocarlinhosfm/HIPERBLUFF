@@ -160,7 +160,6 @@ const SoundEngine = {
   }
 };
 
-// Desbloquear áudio na primeira interação do utilizador
 document.addEventListener("pointerdown", () => SoundEngine.init(), { once: true });
 
 /* ============================================================================
@@ -276,7 +275,7 @@ function scoreFiveCards(cards) {
 }
 
 function evaluateBestHand(cards) {
-  if (cards.length < 5) return { score: 0, name: "—" };
+  if (!cards || cards.length < 5) return { score: 0, name: "—" };
   let best = { score: -1, name: "Carta Alta" };
   const n = cards.length;
   for (let a = 0; a < n - 4; a++)
@@ -291,7 +290,45 @@ function evaluateBestHand(cards) {
 }
 
 /* ============================================================================
-   5. ESTADO LOCAL, SINCRONIZAÇÃO E MOTOR DE TIMERS
+   5. NORMALIZAÇÃO DO ESTADO (CORRIGE ARRAYS VAZIOS APAGADOS PELO FIREBASE)
+   ============================================================================ */
+function normalizeRoomState(raw) {
+  if (!raw) return null;
+  const playersArr = Array.isArray(raw.players)
+    ? raw.players
+    : Object.values(raw.players || {});
+
+  return {
+    hostId: raw.hostId || "",
+    phase: raw.phase || "WAITING",
+    pot: Number(raw.pot) || 0,
+    currentBet: Number(raw.currentBet) || 0,
+    minRaise: Number(raw.minRaise) || BIG_BLIND,
+    dealerIndex: Number(raw.dealerIndex) || 0,
+    turnIndex: raw.turnIndex !== undefined ? Number(raw.turnIndex) : -1,
+    turnDeadline: Number(raw.turnDeadline) || 0,
+    nextHandDeadline: Number(raw.nextHandDeadline) || 0,
+    lastEvent: raw.lastEvent || null,
+    deck: Array.isArray(raw.deck) ? raw.deck : Object.values(raw.deck || {}),
+    community: Array.isArray(raw.community) ? raw.community : Object.values(raw.community || {}),
+    message: raw.message || "",
+    players: playersArr.filter(Boolean).map(p => ({
+      id: p.id,
+      name: p.name || "Jogador",
+      chips: Number(p.chips) || 0,
+      bet: Number(p.bet) || 0,
+      hand: Array.isArray(p.hand) ? p.hand : Object.values(p.hand || {}),
+      folded: Boolean(p.folded),
+      allIn: Boolean(p.allIn),
+      acted: Boolean(p.acted),
+      isBot: Boolean(p.isBot),
+      status: p.status || ""
+    }))
+  };
+}
+
+/* ============================================================================
+   6. ESTADO LOCAL, SINCRONIZAÇÃO E MOTOR DE TIMERS
    ============================================================================ */
 let localMode = true;
 let myId = "p_" + Math.random().toString(36).slice(2, 8);
@@ -299,6 +336,7 @@ let myName = "Jogador";
 let currentRoomCode = null;
 let roomState = null;
 let unsubscribeRoom = null;
+let isSyncingAction = false;
 
 let timerInterval = null;
 let lastHandledTurnDeadline = 0;
@@ -306,6 +344,7 @@ let lastHandledNextHandDeadline = 0;
 let lastPlayedEventTs = 0;
 let lastTickKey = "";
 let wasMyTurn = false;
+let lastSliderTurnKey = "";
 
 const $ = (id) => document.getElementById(id);
 
@@ -342,12 +381,20 @@ function setSoundEvent(state, type) {
 }
 
 async function syncState(newState) {
-  roomState = newState;
+  const clean = normalizeRoomState(newState);
+  roomState = clean;
   if (localMode) {
     renderGame();
     maybeTriggerBotTurn();
   } else if (db && currentRoomCode) {
-    await set(ref(db, `rooms/${currentRoomCode}`), newState);
+    isSyncingAction = true;
+    try {
+      await set(ref(db, `rooms/${currentRoomCode}`), clean);
+    } catch (err) {
+      console.error("Erro ao sincronizar estado com Firebase:", err);
+    } finally {
+      isSyncingAction = false;
+    }
   }
 }
 
@@ -368,26 +415,23 @@ function tickTimers() {
   const now = Date.now();
   const isHost = roomState.hostId === myId;
 
-  // 1. Temporizador de Jogada Ativa
+  // 1. Temporizador de Jogada Ativa (Anel Circular)
   if (roomState.turnIndex >= 0 && roomState.turnDeadline > 0) {
     const remainingMs = Math.max(0, roomState.turnDeadline - now);
     const pct = Math.min(100, (remainingMs / TURN_DURATION_MS) * 100);
     const secs = Math.ceil(remainingMs / 1000);
 
-    const fillEl = $("active-timer-fill");
+    const ringEl = $("active-timer-ring");
     const textEl = $("active-timer-text");
-    if (fillEl) {
-      fillEl.style.width = `${pct}%`;
-      if (secs <= 5) fillEl.style.backgroundColor = "#e11d48";
-      else if (secs <= 10) fillEl.style.backgroundColor = "#f5b942";
-      else fillEl.style.backgroundColor = "#22c55e";
+    if (ringEl) {
+      const color = secs <= 5 ? "#e11d48" : secs <= 10 ? "#f5b942" : "#22c55e";
+      ringEl.style.background = `conic-gradient(${color} ${pct}%, rgba(255, 255, 255, 0.12) ${pct}% 100%)`;
     }
     if (textEl) {
       textEl.textContent = `${secs}s`;
       textEl.classList.toggle("urgent", secs <= 5);
     }
 
-    // Alerta sonoro nos últimos 5 segundos (1 vez por segundo)
     if (secs >= 1 && secs <= 5) {
       const tickKey = `${roomState.turnDeadline}_${secs}`;
       if (lastTickKey !== tickKey) {
@@ -448,10 +492,10 @@ function tickTimers() {
 }
 
 /* ============================================================================
-   6. LÓGICA DO TEXAS HOLD'EM (BLINDS, RONDAS, AÇÕES, SHOWDOWN)
+   7. LÓGICA DO TEXAS HOLD'EM (BLINDS, RONDAS, AÇÕES, SHOWDOWN)
    ============================================================================ */
 function startNewHand() {
-  const s = structuredClone(roomState);
+  const s = normalizeRoomState(structuredClone(roomState));
   const eligible = s.players.filter(p => p.chips > 0);
   if (eligible.length < 2) {
     s.message = "Fim do torneio! Menos de 2 jogadores com fichas.";
@@ -467,7 +511,7 @@ function startNewHand() {
   s.phase = "PREFLOP";
   s.nextHandDeadline = 0;
 
-  let nextDealer = s.dealerIndex;
+  let nextDealer = s.dealerIndex % s.players.length;
   for (let i = 1; i <= s.players.length; i++) {
     const cand = (s.dealerIndex + i) % s.players.length;
     if (s.players[cand].chips > 0) {
@@ -495,9 +539,22 @@ function startNewHand() {
   postBlind(s, sbPos, SMALL_BLIND, "SB");
   postBlind(s, bbPos, BIG_BLIND, "BB");
 
-  s.currentBet = BIG_BLIND;
+  s.currentBet = Math.max(s.players[sbPos].bet, s.players[bbPos].bet);
   s.minRaise = BIG_BLIND;
-  s.turnIndex = nextActiveIndex(s, bbPos);
+
+  const canActAfterBlinds = s.players.filter(p => !p.folded && !p.allIn);
+  const firstToAct = nextActiveIndex(s, bbPos);
+
+  // Se alguém ficou logo em All-In nas blinds e ninguém precisa de cobrir aposta, faz run-out
+  if (
+    firstToAct === -1 ||
+    (canActAfterBlinds.length <= 1 && canActAfterBlinds.every(p => p.bet >= s.currentBet))
+  ) {
+    advancePhase(s);
+    return;
+  }
+
+  s.turnIndex = firstToAct;
   s.turnDeadline = Date.now() + TURN_DURATION_MS;
   s.message = `Cartas dadas! Vez de ${s.players[s.turnIndex].name}.`;
   setSoundEvent(s, "shuffle");
@@ -510,7 +567,7 @@ function postBlind(s, idx, amount, label) {
   p.chips -= paid;
   p.bet += paid;
   s.pot += paid;
-  p.status = label;
+  p.status = paid < amount ? `${label} ALL-IN` : label;
   if (p.chips === 0) p.allIn = true;
 }
 
@@ -524,30 +581,52 @@ function nextActiveIndex(s, fromIdx) {
   return -1;
 }
 
+// Devolve qualquer excesso apostado que nenhum outro jogador na mão conseguiu cobrir
+function refundUncalledBet(s) {
+  const active = s.players.filter(p => !p.folded);
+  if (active.length < 2) return;
+  const sorted = [...active].sort((a, b) => b.bet - a.bet);
+  const excess = sorted[0].bet - sorted[1].bet;
+  if (excess > 0) {
+    sorted[0].bet -= excess;
+    sorted[0].chips += excess;
+    s.pot -= excess;
+    if (sorted[0].chips > 0) sorted[0].allIn = false;
+  }
+}
+
 function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
-  const s = structuredClone(roomState);
+  if (isSyncingAction && !isTimeout) return;
+  if (!roomState) return;
+
+  const s = normalizeRoomState(structuredClone(roomState));
   const idx = s.turnIndex;
-  if (idx < 0 || s.players[idx].id !== playerId) return;
+  if (idx < 0 || !s.players[idx] || s.players[idx].id !== playerId) return;
 
   const p = s.players[idx];
   let soundType = "chip";
 
   if (action === "fold") {
     p.folded = true;
-    p.hand = []; // Apaga as cartas da mesa imediatamente ao fazer Fold
+    p.hand = [];
     p.status = isTimeout ? "AUTO-FOLD" : "FOLD";
     soundType = "fold";
   } else if (action === "check-call") {
-    const toCall = Math.min(p.chips, s.currentBet - p.bet);
+    const toCall = Math.max(0, Math.min(p.chips, s.currentBet - p.bet));
     p.chips -= toCall;
     p.bet += toCall;
     s.pot += toCall;
-    p.status = toCall === 0 ? (isTimeout ? "AUTO-CHECK" : "CHECK") : `CALL ${toCall}€`;
-    soundType = toCall === 0 ? "check" : "chip";
-    if (p.chips === 0) p.allIn = true;
+    if (p.chips === 0 && toCall > 0) {
+      p.allIn = true;
+      p.status = "ALL-IN";
+      soundType = "allin";
+    } else {
+      p.status = toCall === 0 ? (isTimeout ? "AUTO-CHECK" : "CHECK") : `CALL ${toCall}€`;
+      soundType = toCall === 0 ? "check" : "chip";
+    }
   } else if (action === "raise") {
-    const target = Math.max(raiseTo, s.currentBet + s.minRaise);
-    const needed = Math.min(p.chips, target - p.bet);
+    const target = Math.max(Number(raiseTo) || 0, s.currentBet + s.minRaise);
+    const needed = Math.max(0, Math.min(p.chips, target - p.bet));
     const newBet = p.bet + needed;
     if (newBet > s.currentBet) {
       s.minRaise = Math.max(BIG_BLIND, newBet - s.currentBet);
@@ -577,6 +656,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
 
   p.acted = true;
 
+  // Verificar se só sobra 1 jogador na mão (todos os outros deram Fold)
   const remaining = s.players.filter(pl => !pl.folded);
   if (remaining.length === 1) {
     remaining[0].chips += s.pot;
@@ -591,13 +671,27 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     return;
   }
 
+  // Verificar se todos os jogadores que ainda podem agir já responderam à aposta atual
   const canStillAct = s.players.filter(pl => !pl.folded && !pl.allIn);
-  const roundDone = canStillAct.every(pl => pl.acted && pl.bet === s.currentBet);
+  const allMatchedAndActed = canStillAct.every(pl => pl.acted && pl.bet === s.currentBet);
 
-  if (roundDone || canStillAct.length <= 1) {
+  // Só termina a ronda se ninguém mais precisar de agir (incluindo responder a um All-In!)
+  const roundDone =
+    canStillAct.length === 0 ||
+    allMatchedAndActed ||
+    (canStillAct.length === 1 && canStillAct[0].bet >= s.currentBet);
+
+  if (roundDone) {
+    refundUncalledBet(s);
     advancePhase(s);
   } else {
-    s.turnIndex = nextActiveIndex(s, idx);
+    const nextIdx = nextActiveIndex(s, idx);
+    if (nextIdx === -1) {
+      refundUncalledBet(s);
+      advancePhase(s);
+      return;
+    }
+    s.turnIndex = nextIdx;
     s.turnDeadline = Date.now() + TURN_DURATION_MS;
     s.message = `Vez de ${s.players[s.turnIndex].name}.`;
     setSoundEvent(s, soundType);
@@ -606,6 +700,9 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
 }
 
 function advancePhase(s) {
+  if (!Array.isArray(s.community)) s.community = [];
+  if (!Array.isArray(s.deck)) s.deck = [];
+
   s.players.forEach(p => {
     p.bet = 0;
     p.acted = false;
@@ -637,7 +734,13 @@ function advancePhase(s) {
     return;
   }
 
-  s.turnIndex = nextActiveIndex(s, s.dealerIndex);
+  const nextIdx = nextActiveIndex(s, s.dealerIndex);
+  if (nextIdx === -1) {
+    advancePhase(s);
+    return;
+  }
+
+  s.turnIndex = nextIdx;
   s.turnDeadline = Date.now() + TURN_DURATION_MS;
   s.message = `${s.phase} na mesa — Vez de ${s.players[s.turnIndex].name}.`;
   setSoundEvent(s, "card");
@@ -654,7 +757,7 @@ function resolveShowdown(s) {
   let winners = [];
 
   for (const p of contenders) {
-    const evalRes = evaluateBestHand([...p.hand, ...s.community]);
+    const evalRes = evaluateBestHand([...(p.hand || []), ...(s.community || [])]);
     p.status = evalRes.name;
     if (evalRes.score > bestScore) {
       bestScore = evalRes.score;
@@ -665,7 +768,8 @@ function resolveShowdown(s) {
   }
 
   const share = Math.floor(s.pot / winners.length);
-  winners.forEach(w => { w.chips += share; });
+  const remainder = s.pot - share * winners.length;
+  winners.forEach((w, i) => { w.chips += share + (i === 0 ? remainder : 0); });
   const names = winners.map(w => w.name).join(" & ");
   s.message = `🏆 ${names} venceu ${s.pot}€ (${winners[0].status})!`;
 
@@ -676,7 +780,7 @@ function resolveShowdown(s) {
 }
 
 /* ============================================================================
-   7. BOTS PARA MODO TESTE OFFLINE
+   8. BOTS PARA MODO TESTE OFFLINE
    ============================================================================ */
 function maybeTriggerBotTurn() {
   if (!localMode || !roomState || roomState.turnIndex < 0) return;
@@ -703,7 +807,7 @@ function maybeTriggerBotTurn() {
 }
 
 /* ============================================================================
-   8. RENDERIZAÇÃO DA INTERFACE E DISPARO DE SONS
+   9. RENDERIZAÇÃO DA INTERFACE E DISPARO DE SONS
    ============================================================================ */
 function renderPotChipsHTML(amount) {
   if (!amount || amount <= 0) return "";
@@ -745,7 +849,6 @@ function renderCardHTML(card, hidden = false, small = false) {
 function renderGame() {
   if (!roomState) return;
 
-  // Tocar som sincronizado da última ação
   if (roomState.lastEvent && roomState.lastEvent.ts !== lastPlayedEventTs) {
     lastPlayedEventTs = roomState.lastEvent.ts;
     SoundEngine.playEvent(roomState.lastEvent.type);
@@ -778,7 +881,13 @@ function renderGame() {
 
     if (!p) {
       el.className = `seat seat-${seatVisual} empty`;
-      el.innerHTML = `<div class="seat-box">Lugar Livre</div>`;
+      el.innerHTML = `
+        <div class="seat-ring">
+          <div class="seat-circle">
+            <span class="seat-empty-label">Livre</span>
+          </div>
+        </div>
+      `;
       continue;
     }
 
@@ -789,7 +898,6 @@ function renderGame() {
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${p.folded ? "folded" : ""}`;
 
-    // Só mostra as cartas na mesa se o jogador ainda estiver em jogo (sem fold)
     const cardsHTML = inHand
       ? `<div class="seat-cards ${isMe ? "my-cards" : "opp-cards"}">${p.hand.map(c => renderCardHTML(c, !showCards, !isMe)).join("")}</div>`
       : "";
@@ -801,16 +909,16 @@ function renderGame() {
 
     el.innerHTML = `
       ${tableOverlayHTML}
-      ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
-      <div class="seat-box">
-        <div class="seat-header">
-          <div class="seat-name">${p.name}${isMe ? " (Tu)" : ""}</div>
-          ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+      <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
+        ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+        ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+        <div class="seat-circle">
+          <div class="seat-name" title="${p.name}">${p.name}</div>
+          ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
         </div>
-        <div class="seat-chips">${p.chips} €</div>
-        <div class="seat-status">${p.status || ""}</div>
-        ${isTurn ? `<div class="turn-timer-track"><div class="turn-timer-fill" id="active-timer-fill"></div></div>` : ""}
       </div>
+      <div class="seat-chips">${p.chips} €</div>
+      ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}
     `;
   }
 
@@ -833,22 +941,35 @@ function renderGame() {
 
   if (isMyTurn) {
     const toCall = Math.max(0, roomState.currentBet - me.bet);
-    $("btn-check-call").textContent = toCall === 0 ? "Check" : `Call ${Math.min(toCall, me.chips)}€`;
+    const callAmount = Math.min(toCall, me.chips);
+    $("btn-check-call").textContent = toCall === 0
+      ? "Check"
+      : (callAmount >= me.chips ? `Call All-In (${callAmount}€)` : `Call ${callAmount}€`);
 
-    const minRaiseTo = Math.min(me.bet + me.chips, roomState.currentBet + roomState.minRaise);
     const maxRaiseTo = me.bet + me.chips;
+    const canRaise = me.chips > toCall;
+    const minRaiseTo = Math.min(maxRaiseTo, roomState.currentBet + roomState.minRaise);
+
     const slider = $("raise-slider");
-    slider.min = minRaiseTo;
-    slider.max = maxRaiseTo;
-    slider.value = minRaiseTo;
-    $("raise-value").textContent = minRaiseTo;
+    const raiseBtn = $("btn-raise");
+    slider.disabled = !canRaise;
+    raiseBtn.disabled = !canRaise;
+
+    const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
+    if (lastSliderTurnKey !== turnKey) {
+      lastSliderTurnKey = turnKey;
+      slider.min = minRaiseTo;
+      slider.max = maxRaiseTo;
+      slider.value = minRaiseTo;
+      $("raise-value").textContent = minRaiseTo;
+    }
   }
 
   tickTimers();
 }
 
 /* ============================================================================
-   9. EVENTOS DE LOBBY E CONTROLOS
+   10. EVENTOS DE LOBBY E CONTROLOS
    ============================================================================ */
 function openGameScreen() {
   $("lobby-screen").classList.remove("active");
@@ -899,8 +1020,8 @@ $("btn-join-room").addEventListener("click", async () => {
   const snap = await get(ref(db, `rooms/${code}`));
   if (!snap.exists()) return showError("Sala não encontrada.");
 
-  const data = snap.val();
-  const players = data.players || [];
+  const data = normalizeRoomState(snap.val());
+  const players = data.players;
   if (players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
 
   localMode = false;
@@ -920,9 +1041,9 @@ function subscribeToRoom(code) {
   if (unsubscribeRoom) unsubscribeRoom();
   unsubscribeRoom = onValue(ref(db, `rooms/${code}`), (snap) => {
     if (snap.exists()) {
-      roomState = snap.val();
+      roomState = normalizeRoomState(snap.val());
 
-      const players = roomState.players || [];
+      const players = roomState.players;
       if (
         roomState.hostId === myId &&
         roomState.phase === "WAITING" &&
@@ -951,7 +1072,7 @@ $("btn-demo-mode").addEventListener("click", () => {
   botNames.forEach((name, i) => {
     demo.players.push({
       id: `bot_${i}`, name, chips: STARTING_CHIPS, bet: 0,
-      hand: [], folded: false, allIn: false, acted: false, isBot: true
+      hand: [], folded: false, allIn: false, acted: false, isBot: true, status: ""
     });
   });
   roomState = demo;
@@ -970,7 +1091,14 @@ $("btn-copy-code").addEventListener("click", () => {
   navigator.clipboard.writeText(currentRoomCode || "");
 });
 
-$("btn-leave").addEventListener("click", () => {
+$("btn-leave").addEventListener("click", async () => {
+  // Se estiver online e for a minha vez, faz Fold antes de sair para não bloquear a mesa
+  if (!localMode && roomState && roomState.turnIndex >= 0) {
+    const active = roomState.players[roomState.turnIndex];
+    if (active && active.id === myId) {
+      handleAction(myId, "fold");
+    }
+  }
   stopTimerLoop();
   if (unsubscribeRoom) unsubscribeRoom();
   roomState = null;
@@ -980,7 +1108,7 @@ $("btn-leave").addEventListener("click", () => {
 });
 
 /* ============================================================================
-   10. INSTALAÇÃO PWA (ANDROID + IPHONE)
+   11. INSTALAÇÃO PWA (ANDROID + IPHONE)
    ============================================================================ */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
