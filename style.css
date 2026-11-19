@@ -219,6 +219,18 @@ input[type="text"]:focus {
   margin-left: 0.4rem;
 }
 
+.btn-icon {
+  background: #1e293b;
+  border: 1px solid var(--panel-border);
+  padding: 0.4rem 0.65rem;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.btn-icon.muted {
+  opacity: 0.55;
+}
+
 /* ================= TOP BAR ================= */
 .top-bar {
   display: flex;
@@ -259,19 +271,19 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2.5rem 2rem;
+  padding: 3.2rem 2rem;
   position: relative;
 }
 
 .poker-table {
   position: relative;
-  width: min(920px, 88vw);
-  height: min(460px, 58vh);
+  width: min(940px, 86vw);
+  height: min(490px, 60vh);
   background: radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-edge) 100%);
-  border-radius: 240px;
+  border-radius: 250px;
   border: 18px solid var(--rail-wood);
   box-shadow:
-    inset 0 0 60px rgba(0, 0, 0, 0.65),
+    inset 0 0 65px rgba(0, 0, 0, 0.65),
     0 0 0 4px #45281a,
     0 24px 60px rgba(0, 0, 0, 0.7);
   display: flex;
@@ -280,24 +292,118 @@ input[type="text"]:focus {
 }
 
 .table-center {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
   z-index: 2;
+  max-width: 72%;
 }
+
+/* ================= DEALER FIXA E POTE ================= */
+.dealer-station {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(11, 15, 20, 0.72);
+  border: 1px solid rgba(245, 185, 66, 0.4);
+  padding: 0.4rem 0.9rem 0.4rem 0.5rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.dealer-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f5b942, #b45309);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35);
+}
+
+.dealer-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.dealer-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  color: var(--gold);
+}
+
+.table-message {
+  font-size: 0.84rem;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.next-hand-pill {
+  background: var(--gold);
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 0.76rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  margin-left: 0.25rem;
+}
+
+.pot-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 36px;
+}
+
+.pot-chips {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 32px;
+}
+
+.chip-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+}
+
+.poker-chip {
+  width: 20px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.75);
+  margin-top: -3px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+
+.chip-500 { background: #7c3aed; }
+.chip-100 { background: #1e293b; }
+.chip-25  { background: #16a34a; }
+.chip-10  { background: #2563eb; }
+.chip-5   { background: #dc2626; }
 
 .pot-display {
   display: inline-block;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(245, 185, 66, 0.45);
-  padding: 0.35rem 1.1rem;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(245, 185, 66, 0.55);
+  padding: 0.3rem 1rem;
   border-radius: 999px;
   font-weight: 800;
   color: var(--gold);
-  margin-bottom: 0.8rem;
-  font-size: 1rem;
+  font-size: 0.98rem;
 }
 
 .pot-label {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   margin-right: 0.35rem;
   letter-spacing: 1px;
@@ -307,18 +413,8 @@ input[type="text"]:focus {
   display: flex;
   justify-content: center;
   gap: 0.55rem;
-  min-height: 86px;
+  min-height: 84px;
   align-items: center;
-}
-
-.table-message {
-  margin-top: 0.75rem;
-  font-size: 0.88rem;
-  color: #d1fae5;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 0.3rem 0.9rem;
-  border-radius: 999px;
-  display: inline-block;
 }
 
 /* ================= CARTAS ================= */
@@ -394,13 +490,12 @@ input[type="text"]:focus {
   transition: opacity 0.25s ease;
 }
 
-/* Posições geométricas para 6 jogadores */
-.seat-0 { bottom: -16%; left: 50%; transform: translate(-50%, 0); } /* Tu (baixo centro) */
-.seat-1 { bottom: 12%; left: 4%; }
-.seat-2 { top: 14%; left: 8%; }
-.seat-3 { top: -12%; left: 50%; transform: translate(-50%, 0); }
-.seat-4 { top: 14%; right: -10%; }
-.seat-5 { bottom: 12%; right: -13%; }
+.seat-0 { left: 50%; top: 102%; }
+.seat-1 { left: 7%;  top: 76%; }
+.seat-2 { left: 7%;  top: 24%; }
+.seat-3 { left: 50%; top: -4%; }
+.seat-4 { left: 93%; top: 24%; }
+.seat-5 { left: 93%; top: 76%; }
 
 .seat-cards {
   display: flex;
@@ -414,11 +509,12 @@ input[type="text"]:focus {
   background: var(--panel);
   border: 2px solid var(--panel-border);
   border-radius: 12px;
-  padding: 0.5rem 0.65rem;
+  padding: 0.45rem 0.65rem;
   text-align: center;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
   z-index: 2;
   position: relative;
+  overflow: hidden;
 }
 
 .seat.active-turn .seat-box {
@@ -437,12 +533,34 @@ input[type="text"]:focus {
   font-size: 0.8rem;
 }
 
+.seat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
 .seat-name {
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.turn-timer-text {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.turn-timer-text.urgent {
+  color: #fff;
+  background: var(--red);
 }
 
 .seat-chips {
@@ -457,6 +575,22 @@ input[type="text"]:focus {
   text-transform: uppercase;
   margin-top: 2px;
   min-height: 14px;
+}
+
+.turn-timer-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.turn-timer-fill {
+  height: 100%;
+  width: 100%;
+  background: #22c55e;
+  transition: width 0.1s linear, background-color 0.2s ease;
 }
 
 .dealer-chip {
@@ -474,11 +608,12 @@ input[type="text"]:focus {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--gold);
+  z-index: 4;
 }
 
 .bet-pill {
   margin-top: 5px;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.88);
   border: 1px solid var(--gold);
   color: var(--gold);
   font-size: 0.75rem;
@@ -521,19 +656,7 @@ input[type="text"]:focus {
 .btn-call { background: var(--green); min-width: 110px; }
 .btn-raise { background: var(--blue); min-width: 120px; }
 .btn-allin { background: var(--purple); }
-}
 
-.btn-icon {
-  background: #1e293b;
-  border: 1px solid var(--panel-border);
-  padding: 0.4rem 0.65rem;
-  font-size: 0.95rem;
-  line-height: 1;
-}
-
-.btn-icon.muted {
-  opacity: 0.55;
-}
 .raise-control {
   display: flex;
   align-items: center;
@@ -551,7 +674,7 @@ input[type="text"]:focus {
 @media (max-width: 780px) {
   .poker-table {
     width: 94vw;
-    height: 50vh;
+    height: 52vh;
     border-width: 10px;
   }
   .seat {
@@ -561,5 +684,11 @@ input[type="text"]:focus {
     width: 44px;
     height: 62px;
     font-size: 0.8rem;
+  }
+  .dealer-station {
+    padding: 0.3rem 0.65rem;
+  }
+  .table-message {
+    font-size: 0.74rem;
   }
 }
