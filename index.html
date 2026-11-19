@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HIPERBLUFF — Poker Multiplayer</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HIPERBLUFF" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
 </head>
 <body>
 
@@ -37,6 +43,7 @@
       <div class="divider"><span>teste rápido offline</span></div>
 
       <button id="btn-demo-mode" class="btn btn-outline">Jogar Agora (Mesa 6 Jogadores vs Bots)</button>
+      <button id="btn-install-app" class="btn btn-install hidden">📲 Instalar App no Telemóvel</button>
       <p id="lobby-error" class="error-msg"></p>
     </div>
   </div>
@@ -144,7 +151,19 @@
       </div>
     </footer>
   </div>
-
+  
+<div id="ios-install-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <h3>Instalar HIPERBLUFF no iPhone</h3>
+      <ol class="ios-steps">
+        <li>Toca no botão <strong>Partilhar</strong> (ícone de quadrado com seta para cima) na barra do Safari.</li>
+        <li>Desce e toca em <strong>Adicionar ao ecrã principal</strong>.</li>
+        <li>Toca em <strong>Adicionar</strong> no canto superior direito.</li>
+      </ol>
+      <button id="btn-close-ios-modal" class="btn btn-primary">Entendido</button>
+    </div>
+  
+  </div>
   <script type="module" src="game.js"></script>
 </body>
 </html>
