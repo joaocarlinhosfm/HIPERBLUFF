@@ -12,11 +12,11 @@ const firebaseConfig = {
 };
 
 let db = null;
-const isFirebaseConfigured = firebaseConfig.apiKey !== "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk";
-if (isFirebaseConfigured) {
-  const app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
-}
+const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.apiKey !== "SUA_API_KEY" &&
+  firebaseConfig.databaseURL
+);
 
 /* ============================================================================
    2. MOTOR DE ÁUDIO SINTÉTICO (WEB AUDIO API — ZERO MP3 EXTERNOS)
