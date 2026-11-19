@@ -184,7 +184,7 @@ const BIG_BLIND = 20;
 
 const TURN_DURATION_MS = 20000;
 const NEXT_HAND_DELAY_MS = 6000;
-const AUTO_START_DELAY_MS = 10000; // 10 segundos após entrar o 2.º jogador
+const AUTO_START_DELAY_MS = 10000;
 
 function createDeck() {
   const deck = [];
@@ -534,6 +534,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
 
   if (action === "fold") {
     p.folded = true;
+    p.hand = []; // Apaga as cartas da mesa imediatamente ao fazer Fold
     p.status = isTimeout ? "AUTO-FOLD" : "FOLD";
     soundType = "fold";
   } else if (action === "check-call") {
@@ -783,15 +784,23 @@ function renderGame() {
 
     const isMe = p.id === myId;
     const isTurn = roomState.turnIndex === pIdx;
+    const inHand = !p.folded && p.hand && p.hand.length === 2;
     const showCards = isMe || (roomState.phase === "SHOWDOWN" && !p.folded);
 
-    el.className = `seat seat-${seatVisual} ${isTurn ? "active-turn" : ""} ${p.folded ? "folded" : ""}`;
-    const cardsHTML = p.hand && p.hand.length
-      ? p.hand.map(c => renderCardHTML(c, !showCards, true)).join("")
+    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${p.folded ? "folded" : ""}`;
+
+    // Só mostra as cartas na mesa se o jogador ainda estiver em jogo (sem fold)
+    const cardsHTML = inHand
+      ? `<div class="seat-cards ${isMe ? "my-cards" : "opp-cards"}">${p.hand.map(c => renderCardHTML(c, !showCards, !isMe)).join("")}</div>`
+      : "";
+
+    const betHTML = p.bet > 0 ? `<div class="bet-pill">${p.bet} €</div>` : "";
+    const tableOverlayHTML = (cardsHTML || betHTML)
+      ? `<div class="seat-table-zone">${cardsHTML}${betHTML}</div>`
       : "";
 
     el.innerHTML = `
-      <div class="seat-cards">${cardsHTML}</div>
+      ${tableOverlayHTML}
       ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
       <div class="seat-box">
         <div class="seat-header">
@@ -802,12 +811,11 @@ function renderGame() {
         <div class="seat-status">${p.status || ""}</div>
         ${isTurn ? `<div class="turn-timer-track"><div class="turn-timer-fill" id="active-timer-fill"></div></div>` : ""}
       </div>
-      ${p.bet > 0 ? `<div class="bet-pill">${p.bet} €</div>` : ""}
     `;
   }
 
   const me = players[myIndex];
-  if (me && me.hand && me.hand.length === 2) {
+  if (me && !me.folded && me.hand && me.hand.length === 2) {
     const allCards = [...me.hand, ...community];
     const evalText = allCards.length >= 5 ? evaluateBestHand(allCards).name : "Pré-Flop";
     $("hand-strength-badge").textContent = `A tua mão: ${evalText}`;
@@ -870,7 +878,6 @@ $("btn-create-room").addEventListener("click", async () => {
   currentRoomCode = generateRoomCode();
   const initial = createInitialRoom(myId, myName);
 
-  // Senta imediatamente o criador na mesa enquanto grava no Firebase
   roomState = initial;
   openGameScreen();
   renderGame();
@@ -915,7 +922,6 @@ function subscribeToRoom(code) {
     if (snap.exists()) {
       roomState = snap.val();
 
-      // Se o Host detetar o 2.º jogador na fase WAITING, arranca contagem de 10 segundos
       const players = roomState.players || [];
       if (
         roomState.hostId === myId &&
