@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 /* ============================================================================
-   1. CONFIGURAÇÃO FIREBASE (Preenche para ativar o Multiplayer Online)
+   1. CONFIGURAÇÃO FIREBASE
    ============================================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk",
@@ -12,11 +12,12 @@ const firebaseConfig = {
 };
 
 let db = null;
-const isFirebaseConfigured = firebaseConfig.apiKey !== "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk";
+const isFirebaseConfigured = firebaseConfig.apiKey !== "SUA_API_KEY";
 if (isFirebaseConfigured) {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
 }
+
 /* ============================================================================
    2. MOTOR DE ÁUDIO SINTÉTICO (WEB AUDIO API — ZERO MP3 EXTERNOS)
    ============================================================================ */
@@ -922,3 +923,398 @@ function renderGame() {
       bannerEl.classList.add("hidden");
     }
   }
+
+  const myIndex = players.findIndex(p => p.id === myId);
+  const offset = myIndex >= 0 ? myIndex : 0;
+
+  for (let seatVisual = 0; seatVisual < MAX_PLAYERS; seatVisual++) {
+    const el = document.querySelector(`.seat-${seatVisual}`);
+    const pIdx = (seatVisual + offset) % MAX_PLAYERS;
+    const p = players[pIdx];
+
+    if (!p) {
+      el.className = `seat seat-${seatVisual} empty`;
+      el.innerHTML = `
+        <div class="seat-ring">
+          <div class="seat-circle">
+            <span class="seat-empty-label">Livre</span>
+          </div>
+        </div>
+      `;
+      continue;
+    }
+
+    const isMe = p.id === myId;
+    const isTurn = roomState.turnIndex === pIdx;
+    const isWinner = isShowdown && winnerIdsSet.has(p.id);
+    const inHand = !p.folded && p.hand && p.hand.length === 2;
+    const showCards = isMe || (isShowdown && !p.folded && hasCardHighlights);
+
+    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
+
+    // Cartas SEMPRE em cima e parcialmente escondidas atrás do círculo
+    const cardsHTML = inHand
+      ? `<div class="seat-cards ${isMe || isWinner ? "my-cards" : "opp-cards"}">${p.hand.map(c => {
+          let hl = "";
+          if (hasCardHighlights && showCards) {
+            hl = isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
+          }
+          return renderCardHTML(c, !showCards, !(isMe || isWinner), hl);
+        }).join("")}</div>`
+      : "";
+
+    // Aposta da ronda posicionada em direção ao feltro da mesa
+    const betHTML = p.bet > 0
+      ? `<div class="seat-bet-zone"><div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div></div>`
+      : "";
+
+    el.innerHTML = `
+      ${betHTML}
+      <div class="seat-avatar-stack">
+        ${cardsHTML}
+        <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
+          ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+          ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+          <div class="seat-circle">
+            <div class="seat-name" title="${p.name}">${p.name}</div>
+            ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
+          </div>
+          ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
+        </div>
+      </div>
+      <div class="seat-chips">${p.chips} €</div>
+      ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}
+    `;
+  }
+
+  const me = players[myIndex];
+  if (me && !me.folded && me.hand && me.hand.length === 2) {
+    const allCards = [...me.hand, ...community];
+    const evalText = allCards.length >= 5 ? evaluateBestHand(allCards).name : "Pré-Flop";
+    $("hand-strength-badge").textContent = `A tua mão: ${evalText}`;
+  } else {
+    $("hand-strength-badge").textContent = "A tua mão: —";
+  }
+
+  const isMyTurn = Boolean(me && roomState.turnIndex === myIndex && !me.folded && !me.allIn);
+  if (isMyTurn && !wasMyTurn) {
+    setTimeout(() => SoundEngine.myTurn(), 180);
+  }
+  wasMyTurn = isMyTurn;
+
+  $("action-bar").classList.toggle("disabled", !isMyTurn);
+
+  if (isMyTurn) {
+    const toCall = Math.max(0, roomState.currentBet - me.bet);
+    const callAmount = Math.min(toCall, me.chips);
+    $("btn-check-call").textContent = toCall === 0
+      ? "Check"
+      : (callAmount >= me.chips ? `Call All-In (${callAmount}€)` : `Call ${callAmount}€`);
+
+    const maxRaiseTo = me.bet + me.chips;
+    const canRaise = me.chips > toCall;
+    const minRaiseTo = Math.min(maxRaiseTo, roomState.currentBet + roomState.minRaise);
+
+    const slider = $("raise-slider");
+    const raiseBtn = $("btn-raise");
+    slider.disabled = !canRaise;
+    raiseBtn.disabled = !canRaise;
+
+    const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
+    if (lastSliderTurnKey !== turnKey) {
+      lastSliderTurnKey = turnKey;
+      slider.min = minRaiseTo;
+      slider.max = maxRaiseTo;
+      slider.value = minRaiseTo;
+      $("raise-value").textContent = minRaiseTo;
+    }
+  }
+
+  tickTimers();
+}
+
+/* ============================================================================
+   10. EVENTOS DE LOBBY E CONTROLOS
+   ============================================================================ */
+function openGameScreen() {
+  $("lobby-screen").classList.remove("active");
+  $("game-screen").classList.add("active");
+  startTimerLoop();
+}
+
+function showError(msg) {
+  $("lobby-error").textContent = msg;
+}
+
+$("btn-mute").addEventListener("click", () => {
+  const muted = SoundEngine.toggleMute();
+  const btn = $("btn-mute");
+  btn.textContent = muted ? "🔇" : "🔊";
+  btn.classList.toggle("muted", muted);
+});
+
+$("btn-create-room").addEventListener("click", async () => {
+  SoundEngine.init();
+  if (!isFirebaseConfigured) {
+    showError("Configura primeiro as tuas chaves do Firebase no topo de game.js (ou usa o modo teste).");
+    return;
+  }
+  myName = $("player-name").value.trim() || "Jogador";
+  localMode = false;
+  currentRoomCode = generateRoomCode();
+  const initial = createInitialRoom(myId, myName);
+
+  roomState = initial;
+  openGameScreen();
+  renderGame();
+
+  await set(ref(db, `rooms/${currentRoomCode}`), initial);
+  subscribeToRoom(currentRoomCode);
+});
+
+$("btn-join-room").addEventListener("click", async () => {
+  SoundEngine.init();
+  if (!isFirebaseConfigured) {
+    showError("Configura primeiro o Firebase no topo de game.js.");
+    return;
+  }
+  const code = $("room-code").value.trim().toUpperCase();
+  myName = $("player-name").value.trim() || "Jogador";
+  if (!code) return showError("Introduz o código da sala.");
+
+  const snap = await get(ref(db, `rooms/${code}`));
+  if (!snap.exists()) return showError("Sala não encontrada.");
+
+  const data = normalizeRoomState(snap.val());
+  const players = data.players;
+  if (players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
+
+  localMode = false;
+  currentRoomCode = code;
+  players.push({
+    id: myId, name: myName, chips: STARTING_CHIPS, bet: 0,
+    hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false,
+    status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
+  });
+
+  await update(ref(db, `rooms/${code}`), { players });
+  subscribeToRoom(code);
+  openGameScreen();
+});
+
+function subscribeToRoom(code) {
+  if (unsubscribeRoom) unsubscribeRoom();
+  unsubscribeRoom = onValue(ref(db, `rooms/${code}`), (snap) => {
+    if (snap.exists()) {
+      roomState = normalizeRoomState(snap.val());
+
+      const players = roomState.players;
+      if (
+        roomState.hostId === myId &&
+        roomState.phase === "WAITING" &&
+        players.length >= 2 &&
+        (!roomState.nextHandDeadline || roomState.nextHandDeadline === 0)
+      ) {
+        const deadline = Date.now() + AUTO_START_DELAY_MS;
+        update(ref(db, `rooms/${code}`), {
+          nextHandDeadline: deadline,
+          message: `Jogadores na mesa (${players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`
+        });
+      }
+
+      renderGame();
+    }
+  });
+}
+
+$("btn-demo-mode").addEventListener("click", () => {
+  SoundEngine.init();
+  myName = $("player-name").value.trim() || "Tu";
+  localMode = true;
+  currentRoomCode = "OFFLINE";
+  const demo = createInitialRoom(myId, myName);
+  const botNames = ["Tiago", "Marta", "Rui", "Inês", "Carlos"];
+  botNames.forEach((name, i) => {
+    demo.players.push({
+      id: `bot_${i}`, name, chips: STARTING_CHIPS, bet: 0,
+      hand: [], folded: false, allIn: false, acted: false, isBot: true, status: ""
+    });
+  });
+  roomState = demo;
+  openGameScreen();
+  startNewHand();
+});
+
+$("btn-start-game").addEventListener("click", startNewHand);
+$("btn-fold").addEventListener("click", () => handleAction(myId, "fold"));
+$("btn-check-call").addEventListener("click", () => handleAction(myId, "check-call"));
+$("btn-raise").addEventListener("click", () => handleAction(myId, "raise", Number($("raise-slider").value)));
+$("btn-allin").addEventListener("click", () => handleAction(myId, "allin"));
+$("raise-slider").addEventListener("input", (e) => { $("raise-value").textContent = e.target.value; });
+
+$("btn-copy-code").addEventListener("click", () => {
+  navigator.clipboard.writeText(currentRoomCode || "");
+});
+
+$("btn-leave").addEventListener("click", async () => {
+  if (!localMode && roomState && roomState.turnIndex >= 0) {
+    const active = roomState.players[roomState.turnIndex];
+    if (active && active.id === myId) {
+      handleAction(myId, "fold");
+    }
+  }
+  stopTimerLoop();
+  if (unsubscribeRoom) unsubscribeRoom();
+  roomState = null;
+  wasMyTurn = false;
+  $("game-screen").classList.remove("active");
+  $("lobby-screen").classList.add("active");
+});
+
+/* ============================================================================
+   11. INSTALAÇÃO PWA (ANDROID + IPHONE)
+   ============================================================================ */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+let deferredInstallPrompt = null;
+const installBtn = $("btn-install-app");
+const iosModal = $("ios-install-modal");
+
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+if (isIOS && !isStandalone && installBtn) {
+  installBtn.classList.remove("hidden");
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (installBtn && !isStandalone) {
+    installBtn.classList.remove("hidden");
+  }
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  if (installBtn) installBtn.classList.add("hidden");
+});
+
+if (installBtn) {
+  installBtn.addEventListener("click", async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === "accepted") installBtn.classList.add("hidden");
+      deferredInstallPrompt = null;
+    } else if (isIOS && iosModal) {
+      iosModal.classList.remove("hidden");
+    }
+  });
+}
+
+const closeIosBtn = $("btn-close-ios-modal");
+if (closeIosBtn && iosModal) {
+  closeIosBtn.addEventListener("click", () => iosModal.classList.add("hidden"));
+  iosModal.addEventListener("click", (e) => {
+    if (e.target === iosModal) iosModal.classList.add("hidden");
+  });
+}
+
+/* ============================================================================
+   12. FULLSCREEN NATIVO, ORIENTAÇÃO LANDSCAPE E BLOQUEIO DE ZOOM (MOBILE)
+   ============================================================================ */
+const fullscreenBtn = $("btn-fullscreen");
+const rotateHint = $("rotate-hint");
+const btnRotateLandscape = $("btn-rotate-landscape");
+const btnDismissRotate = $("btn-dismiss-rotate");
+
+const canUseFullscreen = Boolean(
+  document.documentElement.requestFullscreen ||
+  document.documentElement.webkitRequestFullscreen
+);
+
+function isInFullscreen() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+async function enterFullscreenLandscape() {
+  const el = document.documentElement;
+  try {
+    if (el.requestFullscreen) {
+      await el.requestFullscreen({ navigationUI: "hide" });
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    }
+  } catch (_) {}
+
+  if (screen.orientation && typeof screen.orientation.lock === "function") {
+    screen.orientation.lock("landscape").catch(() => {});
+  }
+}
+
+async function exitFullscreenMode() {
+  try {
+    if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  } catch (_) {}
+
+  if (screen.orientation && typeof screen.orientation.unlock === "function") {
+    try {
+      screen.orientation.unlock();
+    } catch (_) {}
+  }
+}
+
+function updateFullscreenButton() {
+  if (!fullscreenBtn) return;
+  const active = isInFullscreen();
+  fullscreenBtn.textContent = active ? "⤫" : "⛶";
+  fullscreenBtn.title = active ? "Sair de ecrã inteiro" : "Ecrã inteiro";
+  fullscreenBtn.classList.toggle("active", active);
+}
+
+if (fullscreenBtn) {
+  if (!canUseFullscreen) {
+    fullscreenBtn.classList.add("hidden");
+  } else {
+    fullscreenBtn.addEventListener("click", () => {
+      if (isInFullscreen()) exitFullscreenMode();
+      else enterFullscreenLandscape();
+    });
+  }
+}
+
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+
+if (btnRotateLandscape) {
+  btnRotateLandscape.addEventListener("click", () => {
+    enterFullscreenLandscape();
+  });
+}
+
+if (btnDismissRotate && rotateHint) {
+  btnDismissRotate.addEventListener("click", () => {
+    rotateHint.classList.add("dismissed");
+  });
+}
+
+document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300 && !e.target.closest("button, input, a, label")) {
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, { passive: false });
+
+/* === FIM DO FICHEIRO game.js === */
