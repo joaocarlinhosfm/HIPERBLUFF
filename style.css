@@ -2,9 +2,11 @@
   --bg-dark: #071321;
   --panel: #102033;
   --panel-border: #243b55;
-  --felt-center: #145a3a;
-  --felt-edge: #0a3320;
-  --rail-wood: #2a1810;
+  --felt-center: #146c43;
+  --felt-mid: #0e4f31;
+  --felt-edge: #072b1a;
+  --rail-outer: #1a100c;
+  --rail-inner: #3b2217;
   --gold: #f5b942;
   --ice-bright: #e0f2fe;
   --ice-cyan: #38bdf8;
@@ -12,7 +14,7 @@
   --ice-border: rgba(125, 211, 252, 0.35);
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
-  --red: #e11d48;
+  --red: #dc2626;
   --blue: #2563eb;
   --green: #16a34a;
   --purple: #7c3aed;
@@ -26,11 +28,12 @@
 }
 
 body {
-  background: radial-gradient(circle at top, #10243d, var(--bg-dark));
+  background: radial-gradient(circle at 50% 15%, #112a46 0%, #071321 55%, #030912 100%);
   color: var(--text-main);
   min-height: 100vh;
   overflow: hidden;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 .screen {
@@ -304,7 +307,7 @@ input[type="text"]:focus {
 }
 
 .btn-danger {
-  background: var(--red);
+  background: linear-gradient(180deg, #ef4444, #b91c1c);
 }
 
 .btn-sm {
@@ -341,9 +344,10 @@ input[type="text"]:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.7rem 1.4rem;
-  background: rgba(8, 20, 36, 0.94);
-  border-bottom: 1px solid rgba(125, 211, 252, 0.2);
+  padding: 0.65rem 1.4rem;
+  background: rgba(8, 20, 36, 0.95);
+  border-bottom: 1px solid rgba(125, 211, 252, 0.22);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
   z-index: 10;
 }
 
@@ -365,45 +369,77 @@ input[type="text"]:focus {
 .badge {
   background: #0f2942;
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 0.25rem 0.65rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 1px;
 }
 
-/* ================= MESA DE POKER ================= */
+/* ================= MESA DE POKER HD ================= */
 .table-area {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5.4rem 6.2rem 5.4rem;
+  padding: 5.8rem 6.2rem 5.4rem;
   position: relative;
 }
 
 .poker-table {
   position: relative;
-  width: min(850px, 75vw);
-  height: min(400px, 48vh);
-  background: radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-edge) 100%);
-  border-radius: 220px;
-  border: 18px solid var(--rail-wood);
+  width: min(860px, 76vw);
+  height: min(400px, 47vh);
+  border-radius: 225px;
+  /* Feltro texturizado com gradiente de iluminação de casino */
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.08) 0%, transparent 58%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0px, rgba(255, 255, 255, 0.012) 2px, transparent 2px, transparent 4px),
+    radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 58%, var(--felt-edge) 100%);
+  border: 18px solid var(--rail-inner);
   box-shadow:
-    inset 0 0 65px rgba(0, 0, 0, 0.65),
-    0 0 0 4px #45281a,
-    0 24px 60px rgba(0, 0, 0, 0.7);
+    inset 0 0 0 2px rgba(245, 185, 66, 0.35),
+    inset 0 0 70px rgba(0, 0, 0, 0.72),
+    0 0 0 4px var(--rail-outer),
+    0 0 0 6px rgba(56, 189, 248, 0.22),
+    0 28px 70px rgba(0, 0, 0, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Linha oval interior do feltro */
+.table-betting-line {
+  position: absolute;
+  inset: 22px 30px;
+  border-radius: 195px;
+  border: 1.5px solid rgba(253, 224, 71, 0.22);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Marca d'água subtil no feltro */
+.table-watermark {
+  position: absolute;
+  bottom: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 1;
 }
 
 /* ================= DEALER FIXA NO TOPO ================= */
 .dealer-seat {
   position: absolute;
   left: 50%;
-  top: -16%;
+  top: -17%;
   transform: translate(-50%, -40%);
   display: flex;
   flex-direction: column;
@@ -413,13 +449,16 @@ input[type="text"]:focus {
 }
 
 .dealer-avatar-wrap {
-  width: 74px;
-  height: 74px;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
   border: 3px solid var(--gold);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 18px rgba(245, 185, 66, 0.35);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.75),
+    0 0 20px rgba(245, 185, 66, 0.38),
+    inset 0 0 10px rgba(0, 0, 0, 0.45);
   overflow: hidden;
-  background: #0f172a;
+  background: #071321;
 }
 
 .dealer-svg {
@@ -435,16 +474,16 @@ input[type="text"]:focus {
   margin-top: -12px;
   background: linear-gradient(180deg, #1e293b, #0f172a);
   border: 1.5px solid var(--gold);
-  padding: 0.18rem 0.85rem;
+  padding: 0.18rem 0.9rem;
   border-radius: 999px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
   z-index: 2;
 }
 
 .dealer-tag {
   font-size: 0.7rem;
   font-weight: 800;
-  letter-spacing: 1.6px;
+  letter-spacing: 1.8px;
   color: var(--gold);
 }
 
@@ -459,15 +498,15 @@ input[type="text"]:focus {
 
 .dealer-speech {
   margin-top: 6px;
-  background: rgba(11, 15, 20, 0.84);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(7, 19, 33, 0.88);
+  border: 1px solid rgba(125, 211, 252, 0.22);
   color: #e2e8f0;
   font-size: 0.76rem;
   font-weight: 600;
-  padding: 0.24rem 0.85rem;
+  padding: 0.24rem 0.9rem;
   border-radius: 999px;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 /* ================= CENTRO DO FELTRO (POTE + CARTAS + BANNER) ================= */
@@ -477,7 +516,7 @@ input[type="text"]:focus {
   align-items: center;
   gap: 0.6rem;
   z-index: 3;
-  margin-top: 0.7rem;
+  margin-top: 0.5rem;
   position: relative;
 }
 
@@ -492,8 +531,8 @@ input[type="text"]:focus {
 .pot-chips {
   display: flex;
   align-items: flex-end;
-  gap: 5px;
-  height: 32px;
+  gap: 6px;
+  height: 34px;
 }
 
 .chip-stack {
@@ -502,48 +541,54 @@ input[type="text"]:focus {
   align-items: center;
 }
 
+/* Fichas 3D com rebordo realista */
 .poker-chip {
-  width: 20px;
-  height: 7px;
+  width: 22px;
+  height: 8px;
   border-radius: 50%;
-  border: 1.5px dashed rgba(255, 255, 255, 0.75);
-  margin-top: -3px;
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+  border: 1.5px dashed rgba(255, 255, 255, 0.88);
+  margin-top: -3.5px;
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -2px 2px rgba(0, 0, 0, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.65);
 }
 
-.chip-500 { background: #7c3aed; }
-.chip-100 { background: #1e293b; }
-.chip-25  { background: #16a34a; }
-.chip-10  { background: #2563eb; }
-.chip-5   { background: #dc2626; }
+.chip-500 { background: linear-gradient(90deg, #6d28d9, #8b5cf6, #5b21b6); }
+.chip-100 { background: linear-gradient(90deg, #0f172a, #334155, #0f172a); }
+.chip-25  { background: linear-gradient(90deg, #15803d, #22c55e, #14532d); }
+.chip-10  { background: linear-gradient(90deg, #1d4ed8, #3b82f6, #1e3a8a); }
+.chip-5   { background: linear-gradient(90deg, #b91c1c, #ef4444, #991b1b); }
 
 .pot-display {
-  display: inline-block;
-  background: rgba(0, 0, 0, 0.52);
-  border: 1px solid rgba(245, 185, 66, 0.55);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(7, 15, 28, 0.94));
+  border: 1.5px solid rgba(245, 185, 66, 0.65);
   padding: 0.3rem 1.05rem;
   border-radius: 999px;
   font-weight: 800;
   color: var(--gold);
   font-size: 1rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .pot-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
-  margin-right: 0.35rem;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
 }
 
 .community-cards {
   display: flex;
   justify-content: center;
-  gap: 0.55rem;
-  min-height: 86px;
+  gap: 0.6rem;
+  min-height: 88px;
   align-items: center;
 }
 
-/* Banner da Mão Vencedora (ex: FULL HOUSE) */
+/* Banner da Mão Vencedora */
 .winning-hand-banner {
   margin-top: 2px;
   padding: 0.32rem 2.4rem;
@@ -572,68 +617,118 @@ input[type="text"]:focus {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* ================= CARTAS E DESTAQUE VENCEDOR ================= */
+/* ================= CARTAS HD (FRENTE E VERSO GLACIAL) ================= */
 .card {
-  width: 56px;
-  height: 80px;
-  background: #ffffff;
-  border-radius: 8px;
-  color: #111827;
+  width: 60px;
+  height: 86px;
+  background: linear-gradient(155deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 9px;
+  color: #0f172a;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 4px 6px;
-  font-weight: 800;
-  font-size: 0.98rem;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  padding: 4px 5px;
+  font-weight: 900;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   position: relative;
   transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
 }
 
 .card.red {
-  color: var(--red);
+  color: #dc2626;
 }
 
-.card .card-center {
-  font-size: 1.45rem;
-  text-align: center;
-  line-height: 1;
+.card-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.92;
+  width: 16px;
 }
 
-.card .card-bottom {
-  text-align: right;
-  font-size: 0.82rem;
+.card-corner.bottom {
+  align-self: flex-end;
   transform: rotate(180deg);
 }
 
-.card.back {
-  background: repeating-linear-gradient(
-    45deg,
-    #1e3a8a,
-    #1e3a8a 5px,
-    #172554 5px,
-    #172554 10px
-  );
-  border: 2px solid #e2e8f0;
+.card-rank {
+  font-size: 0.95rem;
+  letter-spacing: -0.5px;
 }
 
-.card.small {
-  width: 38px;
-  height: 54px;
+.card-suit-mini {
   font-size: 0.72rem;
-  padding: 2px 4px;
-  border-radius: 6px;
+}
+
+.card-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12));
+}
+
+/* Verso da carta premium HIPERBLUFF */
+.card.back {
+  background: linear-gradient(145deg, #f8fafc, #cbd5e1);
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+.card-back-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  background:
+    repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
+    repeating-linear-gradient(-45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
+    radial-gradient(circle at center, #1d4ed8 0%, #0f172a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-back-emblem {
+  color: rgba(186, 230, 253, 0.85);
+  font-size: 1.15rem;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.85);
+}
+
+/* Cartas pequenas (adversários) */
+.card.small {
+  width: 42px;
+  height: 60px;
+  padding: 3px 4px;
+  border-radius: 7px;
+}
+
+.card.small .card-corner {
+  width: 12px;
+}
+
+.card.small .card-rank {
+  font-size: 0.72rem;
+}
+
+.card.small .card-suit-mini {
+  font-size: 0.56rem;
 }
 
 .card.small .card-center {
-  font-size: 1.02rem;
+  font-size: 1.15rem;
 }
 
-.card.small .card-bottom {
-  font-size: 0.65rem;
+.card.small .card-back-emblem {
+  font-size: 0.85rem;
 }
 
-/* Cartas que fazem parte da mão vencedora (brilho dourado + destaque) */
+/* Cartas vencedoras (brilho dourado + destaque) */
 .card.card-win {
   border: 2.5px solid #fde047;
   box-shadow:
@@ -644,16 +739,16 @@ input[type="text"]:focus {
 }
 
 .community-cards .card.card-win {
-  transform: translateY(-7px) scale(1.05);
+  transform: translateY(-7px) scale(1.06);
 }
 
-/* Cartas que NÃO fazem parte da combinação vencedora (escurecidas) */
+/* Cartas não vencedoras (escurecidas no showdown) */
 .card.card-dim {
   filter: brightness(0.45) saturate(0.55);
   opacity: 0.82;
 }
 
-/* ================= 6 LUGARES CIRCULARES FORA DA MESA ================= */
+/* ================= 6 LUGARES CIRCULARES + CARTAS SEMPRE ATRÁS DO TOPO ================= */
 .seats-container {
   position: absolute;
   inset: 0;
@@ -662,7 +757,7 @@ input[type="text"]:focus {
 
 .seat {
   position: absolute;
-  width: 112px;
+  width: 118px;
   transform: translate(-50%, -50%);
   pointer-events: auto;
   display: flex;
@@ -672,70 +767,52 @@ input[type="text"]:focus {
 }
 
 .seat-0 { left: 30%; top: 117%; }
-.seat-1 { left: -9%; top: 52%; }
-.seat-2 { left: 16%; top: -13%; }
-.seat-3 { left: 84%; top: -13%; }
-.seat-4 { left: 109%; top: 52%; }
+.seat-1 { left: -9%; top: 53%; }
+.seat-2 { left: 16%; top: -11%; }
+.seat-3 { left: 84%; top: -11%; }
+.seat-4 { left: 109%; top: 53%; }
 .seat-5 { left: 70%; top: 117%; }
 
-.seat-table-zone {
-  position: absolute;
+/* Container do círculo + cartas sempre em cima e parcialmente atrás do círculo */
+.seat-avatar-stack {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  z-index: 4;
-  pointer-events: none;
-}
-
-.seat-0 .seat-table-zone,
-.seat-5 .seat-table-zone {
-  bottom: 108%;
-  left: 50%;
-  transform: translateX(-50%);
-  flex-direction: column-reverse;
-}
-
-.seat-2 .seat-table-zone,
-.seat-3 .seat-table-zone {
-  top: 106%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.seat-1 .seat-table-zone {
-  left: 106%;
-  top: 44%;
-  transform: translateY(-50%);
-}
-
-.seat-4 .seat-table-zone {
-  right: 106%;
-  top: 44%;
-  transform: translateY(-50%);
 }
 
 .seat-cards {
+  position: absolute;
+  bottom: 54%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1; /* Fica ATRÁS do .seat-ring (z-index: 3) */
+  pointer-events: none;
 }
 
 .seat-cards .card:first-child {
-  transform: rotate(-7deg);
-  margin-right: -10px;
+  transform: rotate(-11deg);
+  margin-right: -12px;
   z-index: 1;
 }
 
 .seat-cards .card:last-child {
-  transform: rotate(7deg);
+  transform: rotate(11deg);
   z-index: 2;
 }
 
+/* As tuas cartas (ou do vencedor no showdown) aparecem ligeiramente mais altas para leitura perfeita */
+.seat-cards.my-cards {
+  bottom: 58%;
+}
+
 .seat-cards.my-cards .card {
-  width: 52px;
-  height: 74px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55), 0 0 12px rgba(56, 189, 248, 0.25);
+  width: 54px;
+  height: 76px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.58), 0 0 12px rgba(56, 189, 248, 0.25);
 }
 
 .seat-cards.my-cards .card.card-win {
@@ -744,23 +821,58 @@ input[type="text"]:focus {
     0 0 8px 1px rgba(255, 255, 255, 0.85);
 }
 
+/* Ficha de aposta da ronda sempre voltada para o feltro sem tapar as cartas */
+.seat-bet-zone {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.seat-0 .seat-bet-zone,
+.seat-5 .seat-bet-zone {
+  bottom: 132%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.seat-2 .seat-bet-zone,
+.seat-3 .seat-bet-zone {
+  top: 108%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.seat-1 .seat-bet-zone {
+  left: 108%;
+  top: 45%;
+  transform: translateY(-50%);
+}
+
+.seat-4 .seat-bet-zone {
+  right: 108%;
+  top: 45%;
+  transform: translateY(-50%);
+}
+
 .seat-ring {
   position: relative;
   width: 82px;
   height: 82px;
   border-radius: 50%;
   padding: 3px;
-  background: linear-gradient(145deg, #334e6f, #1b2d44);
+  background: linear-gradient(145deg, #3b5b82, #17273b);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
-  z-index: 2;
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.65),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  z-index: 3; /* Fica À FRENTE da base das cartas */
 }
 
 .seat.is-me .seat-ring {
   background: linear-gradient(135deg, #7dd3fc, #0284c7);
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 8px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 8px 20px rgba(0, 0, 0, 0.65);
 }
 
 .seat.active-turn .seat-ring {
@@ -768,7 +880,6 @@ input[type="text"]:focus {
   box-shadow: 0 0 24px rgba(245, 185, 66, 0.65);
 }
 
-/* Destaque do Jogador Vencedor */
 .seat.is-winner .seat-ring {
   background: linear-gradient(135deg, #fef08a, #f59e0b, #ea580c);
   padding: 4px;
@@ -806,7 +917,7 @@ input[type="text"]:focus {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 25%, #1a3554 0%, #0b1829 100%);
+  background: radial-gradient(circle at 30% 25%, #1d3b5e 0%, #091525 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -814,6 +925,7 @@ input[type="text"]:focus {
   padding: 6px;
   text-align: center;
   overflow: hidden;
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.08);
 }
 
 .seat.folded {
@@ -860,13 +972,13 @@ input[type="text"]:focus {
   font-size: 0.84rem;
   color: var(--gold);
   font-weight: 800;
-  background: rgba(7, 19, 33, 0.86);
-  border: 1px solid rgba(245, 185, 66, 0.38);
+  background: rgba(7, 19, 33, 0.9);
+  border: 1px solid rgba(245, 185, 66, 0.42);
   padding: 2px 10px;
   border-radius: 999px;
   white-space: nowrap;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
-  z-index: 2;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  z-index: 4;
 }
 
 .seat-status {
@@ -876,18 +988,18 @@ input[type="text"]:focus {
   color: #7dd3fc;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: rgba(11, 25, 44, 0.88);
+  background: rgba(11, 25, 44, 0.9);
   padding: 1px 7px;
   border-radius: 999px;
   white-space: nowrap;
-  z-index: 2;
+  z-index: 4;
 }
 
 .turn-timer-text {
   position: absolute;
   top: -6px;
   left: -6px;
-  z-index: 6;
+  z-index: 7;
   font-size: 0.7rem;
   font-weight: 800;
   color: var(--gold);
@@ -911,7 +1023,7 @@ input[type="text"]:focus {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #fff;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 70%, #94a3b8 100%);
   color: #0f172a;
   font-weight: 900;
   font-size: 0.75rem;
@@ -919,26 +1031,39 @@ input[type="text"]:focus {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--gold);
-  z-index: 6;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+  z-index: 7;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
 }
 
 .bet-pill {
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid var(--gold);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(10, 20, 36, 0.92);
+  border: 1px solid rgba(245, 185, 66, 0.75);
   color: var(--gold);
   font-size: 0.74rem;
-  font-weight: 700;
-  padding: 2px 9px;
+  font-weight: 800;
+  padding: 2px 9px 2px 6px;
   border-radius: 999px;
   white-space: nowrap;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.55);
+}
+
+.mini-chip {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f59e0b, #b45309);
+  border: 1.5px dashed #fef08a;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 /* ================= BARRA DE AÇÕES ================= */
 .controls-bar {
   background: rgba(8, 20, 36, 0.96);
-  border-top: 1px solid rgba(125, 211, 252, 0.2);
+  border-top: 1px solid rgba(125, 211, 252, 0.22);
   padding: 0.8rem 1.4rem;
   display: flex;
   justify-content: space-between;
@@ -965,16 +1090,17 @@ input[type="text"]:focus {
   pointer-events: none;
 }
 
-.btn-fold { background: #dc2626; }
-.btn-call { background: var(--green); min-width: 110px; }
-.btn-raise { background: var(--blue); min-width: 120px; }
-.btn-allin { background: var(--purple); }
+.btn-fold { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+.btn-call { background: linear-gradient(180deg, #22c55e, #15803d); min-width: 110px; }
+.btn-raise { background: linear-gradient(180deg, #3b82f6, #1d4ed8); min-width: 120px; }
+.btn-allin { background: linear-gradient(180deg, #8b5cf6, #6d28d9); }
 
 .raise-control {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   background: #132842;
+  border: 1px solid rgba(125, 211, 252, 0.2);
   padding: 0.35rem 0.6rem;
   border-radius: 10px;
 }
@@ -993,16 +1119,19 @@ input[type="text"]:focus {
     height: 92px;
   }
   .table-area {
-    padding: 4.5rem 2.6rem 4.5rem;
+    padding: 4.8rem 2.6rem 4.5rem;
   }
   .poker-table {
     width: 78vw;
-    height: 42vh;
+    height: 41vh;
     border-width: 10px;
   }
+  .table-betting-line {
+    inset: 12px 16px;
+  }
   .dealer-avatar-wrap {
-    width: 54px;
-    height: 54px;
+    width: 56px;
+    height: 56px;
   }
   .winning-hand-banner {
     font-size: 0.95rem;
@@ -1010,7 +1139,7 @@ input[type="text"]:focus {
     letter-spacing: 1.5px;
   }
   .seat {
-    width: 84px;
+    width: 86px;
   }
   .seat-ring {
     width: 62px;
@@ -1024,24 +1153,35 @@ input[type="text"]:focus {
     padding: 1px 7px;
   }
   .seat-0 { left: 28%; top: 116%; }
-  .seat-1 { left: -7%; top: 52%; }
-  .seat-2 { left: 14%; top: -13%; }
-  .seat-3 { left: 86%; top: -13%; }
-  .seat-4 { left: 107%; top: 52%; }
+  .seat-1 { left: -7%; top: 53%; }
+  .seat-2 { left: 14%; top: -11%; }
+  .seat-3 { left: 86%; top: -11%; }
+  .seat-4 { left: 107%; top: 53%; }
   .seat-5 { left: 72%; top: 116%; }
   .card {
-    width: 42px;
-    height: 60px;
-    font-size: 0.78rem;
+    width: 44px;
+    height: 62px;
+    padding: 3px 4px;
+  }
+  .card-rank {
+    font-size: 0.76rem;
+  }
+  .card-center {
+    font-size: 1.25rem;
   }
   .card.small {
-    width: 28px;
-    height: 40px;
-    font-size: 0.6rem;
+    width: 30px;
+    height: 44px;
+  }
+  .card.small .card-rank {
+    font-size: 0.56rem;
+  }
+  .card.small .card-center {
+    font-size: 0.85rem;
   }
   .seat-cards.my-cards .card {
-    width: 38px;
-    height: 54px;
+    width: 40px;
+    height: 56px;
   }
   .dealer-speech {
     font-size: 0.68rem;
