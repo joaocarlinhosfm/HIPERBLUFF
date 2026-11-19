@@ -6,7 +6,7 @@
   <title>HIPERBLUFF — Poker Multiplayer</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0b0f14" />
+  <meta name="theme-color" content="#071321" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="HIPERBLUFF" />
@@ -14,13 +14,35 @@
 </head>
 <body>
 
-  <!-- ECRÃ DE LOBBY -->
+  <!-- ECRÃ DE LOBBY (TEMA FRIO / GLACIAL) -->
   <div id="lobby-screen" class="screen active">
+    <!-- Camada de neve/cristais de gelo animada (CSS puro) -->
+    <div class="snow-layer" aria-hidden="true">
+      <span class="flake f1">❄</span>
+      <span class="flake f2">•</span>
+      <span class="flake f3">❅</span>
+      <span class="flake f4">•</span>
+      <span class="flake f5">❄</span>
+      <span class="flake f6">•</span>
+      <span class="flake f7">❆</span>
+      <span class="flake f8">•</span>
+      <span class="flake f9">❄</span>
+      <span class="flake f10">•</span>
+      <span class="flake f11">❅</span>
+      <span class="flake f12">•</span>
+    </div>
+
     <div class="lobby-card">
+      <div class="frost-top-edge" aria-hidden="true"></div>
+
+      <div class="lobby-logo-wrap">
+        <img src="icon-512.png" alt="HIPERBLUFF" class="lobby-logo" onerror="this.style.display='none'" />
+      </div>
+
       <div class="brand">
         <span class="brand-suit">♠</span>
         <h1>HIPERBLUFF</h1>
-        <span class="brand-suit red">♥</span>
+        <span class="brand-suit ice">❄</span>
       </div>
       <p class="subtitle">Texas Hold'em • Mesa até 6 Jogadores</p>
 
@@ -52,7 +74,7 @@
   <div id="game-screen" class="screen">
     <header class="top-bar">
       <div class="top-left">
-        <span class="logo-mini">♠ HIPERBLUFF</span>
+        <span class="logo-mini">❄ HIPERBLUFF</span>
         <span id="display-phase" class="badge">AGUARDAR</span>
       </div>
       <div class="top-center">
@@ -151,10 +173,11 @@
       </div>
     </footer>
   </div>
-  
-<div id="ios-install-modal" class="modal-backdrop hidden">
+
+  <!-- MODAL DE INSTALAÇÃO PARA IPHONE (SAFARI) -->
+  <div id="ios-install-modal" class="modal-backdrop hidden">
     <div class="modal-box">
-      <h3>Instalar HIPERBLUFF no iPhone</h3>
+      <h3>❄ Instalar HIPERBLUFF no iPhone</h3>
       <ol class="ios-steps">
         <li>Toca no botão <strong>Partilhar</strong> (ícone de quadrado com seta para cima) na barra do Safari.</li>
         <li>Desce e toca em <strong>Adicionar ao ecrã principal</strong>.</li>
@@ -162,8 +185,8 @@
       </ol>
       <button id="btn-close-ios-modal" class="btn btn-primary">Entendido</button>
     </div>
-  
   </div>
+
   <script type="module" src="game.js"></script>
 </body>
 </html>
