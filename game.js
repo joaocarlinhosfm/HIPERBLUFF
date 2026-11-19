@@ -922,5 +922,3 @@ function renderGame() {
       bannerEl.classList.add("hidden");
     }
   }
-
-  const myIndex = players.findIndex(p => p.id === myId);
