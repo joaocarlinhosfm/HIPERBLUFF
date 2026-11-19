@@ -521,7 +521,19 @@ input[type="text"]:focus {
 .btn-call { background: var(--green); min-width: 110px; }
 .btn-raise { background: var(--blue); min-width: 120px; }
 .btn-allin { background: var(--purple); }
+}
 
+.btn-icon {
+  background: #1e293b;
+  border: 1px solid var(--panel-border);
+  padding: 0.4rem 0.65rem;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.btn-icon.muted {
+  opacity: 0.55;
+}
 .raise-control {
   display: flex;
   align-items: center;
