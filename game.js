@@ -5,10 +5,10 @@ import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic
    1. CONFIGURAÇÃO FIREBASE (Preenche para ativar o Multiplayer Online)
    ============================================================================ */
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  databaseURL: "https://SEU_PROJETO-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "SEU_PROJETO"
+  apiKey: "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk",
+  authDomain: "hiperbluff.firebaseapp.com",
+  databaseURL: "https://hiperbluff-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "hiperbluff"
 };
 
 let db = null;
