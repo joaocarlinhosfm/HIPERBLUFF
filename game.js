@@ -919,8 +919,9 @@ $("btn-leave").addEventListener("click", () => {
   wasMyTurn = false;
   $("game-screen").classList.remove("active");
   $("lobby-screen").classList.add("active");
-}
-   /* ============================================================================
+});
+
+/* ============================================================================
    10. INSTALAÇÃO PWA (ANDROID + IPHONE)
    ============================================================================ */
 if ("serviceWorker" in navigator) {
@@ -975,3 +976,4 @@ if (closeIosBtn && iosModal) {
     if (e.target === iosModal) iosModal.classList.add("hidden");
   });
 }
+Generating complete, downloadable code files
