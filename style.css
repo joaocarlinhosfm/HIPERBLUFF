@@ -385,14 +385,14 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5.2rem 6.2rem 5rem;
+  padding: 5.4rem 6.2rem 5.4rem;
   position: relative;
 }
 
 .poker-table {
   position: relative;
   width: min(850px, 75vw);
-  height: min(400px, 49vh);
+  height: min(400px, 48vh);
   background: radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-edge) 100%);
   border-radius: 220px;
   border: 18px solid var(--rail-wood);
@@ -608,7 +608,7 @@ input[type="text"]:focus {
   font-size: 0.65rem;
 }
 
-/* ================= 6 LUGARES FORA DA MESA + CARTAS NO FELTRO ================= */
+/* ================= 6 LUGARES CIRCULARES FORA DA MESA ================= */
 .seats-container {
   position: absolute;
   inset: 0;
@@ -617,7 +617,7 @@ input[type="text"]:focus {
 
 .seat {
   position: absolute;
-  width: 152px;
+  width: 112px;
   transform: translate(-50%, -50%);
   pointer-events: auto;
   display: flex;
@@ -626,13 +626,12 @@ input[type="text"]:focus {
   transition: opacity 0.25s ease;
 }
 
-/* Jogadores puxados mais para fora da borda da mesa */
-.seat-0 { left: 30%; top: 116%; } /* Tu (baixo esquerda) */
-.seat-1 { left: -10%; top: 52%; } /* Esquerda meio */
+.seat-0 { left: 30%; top: 117%; } /* Tu (baixo esquerda) */
+.seat-1 { left: -9%; top: 52%; }  /* Esquerda meio */
 .seat-2 { left: 16%; top: -13%; } /* Topo esquerda */
 .seat-3 { left: 84%; top: -13%; } /* Topo direita */
-.seat-4 { left: 110%; top: 52%; } /* Direita meio */
-.seat-5 { left: 70%; top: 116%; } /* Baixo direita */
+.seat-4 { left: 109%; top: 52%; } /* Direita meio */
+.seat-5 { left: 70%; top: 117%; } /* Baixo direita */
 
 /* Zona de cartas + aposta posicionada em direção ao feltro da mesa */
 .seat-table-zone {
@@ -645,34 +644,30 @@ input[type="text"]:focus {
   pointer-events: none;
 }
 
-/* Jogadores de baixo: cartas pousadas no feltro ACIMA do cartão */
 .seat-0 .seat-table-zone,
 .seat-5 .seat-table-zone {
-  bottom: 112%;
+  bottom: 108%;
   left: 50%;
   transform: translateX(-50%);
   flex-direction: column-reverse;
 }
 
-/* Jogadores de cima: cartas pousadas no feltro ABAIXO do cartão */
 .seat-2 .seat-table-zone,
 .seat-3 .seat-table-zone {
-  top: 112%;
+  top: 106%;
   left: 50%;
   transform: translateX(-50%);
 }
 
-/* Jogador da esquerda: cartas pousadas no feltro À DIREITA do cartão */
 .seat-1 .seat-table-zone {
-  left: 110%;
-  top: 50%;
+  left: 106%;
+  top: 44%;
   transform: translateY(-50%);
 }
 
-/* Jogador da direita: cartas pousadas no feltro À ESQUERDA do cartão */
 .seat-4 .seat-table-zone {
-  right: 110%;
-  top: 50%;
+  right: 106%;
+  top: 44%;
   transform: translateY(-50%);
 }
 
@@ -682,7 +677,6 @@ input[type="text"]:focus {
   justify-content: center;
 }
 
-/* Leque natural das 2 cartas na mesa */
 .seat-cards .card:first-child {
   transform: rotate(-7deg);
   margin-right: -10px;
@@ -700,103 +694,137 @@ input[type="text"]:focus {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55), 0 0 12px rgba(56, 189, 248, 0.25);
 }
 
-.seat-box {
-  width: 100%;
-  background: var(--panel);
-  border: 2px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 0.45rem 0.65rem;
-  text-align: center;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
-  z-index: 2;
+/* Anel exterior + Círculo do jogador */
+.seat-ring {
   position: relative;
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(145deg, #334e6f, #1b2d44);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+.seat.is-me .seat-ring {
+  background: linear-gradient(135deg, #7dd3fc, #0284c7);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.seat.active-turn .seat-ring {
+  padding: 4px;
+  box-shadow: 0 0 24px rgba(245, 185, 66, 0.65);
+}
+
+.seat-circle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #1a3554 0%, #0b1829 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  text-align: center;
   overflow: hidden;
-}
-
-.seat.is-me .seat-box {
-  border-color: rgba(56, 189, 248, 0.65);
-}
-
-.seat.active-turn .seat-box {
-  border-color: var(--gold);
-  box-shadow: 0 0 22px rgba(245, 185, 66, 0.6);
 }
 
 .seat.folded {
   opacity: 0.45;
 }
 
-.seat.empty .seat-box {
-  border-style: dashed;
-  background: rgba(16, 32, 51, 0.55);
-  color: var(--text-muted);
-  font-size: 0.8rem;
+.seat.empty .seat-ring {
+  background: transparent;
+  border: 2px dashed rgba(125, 211, 252, 0.32);
+  box-shadow: none;
 }
 
-.seat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 4px;
+.seat.empty .seat-circle {
+  background: rgba(16, 32, 51, 0.45);
+}
+
+.seat-empty-label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .seat-name {
-  font-weight: 700;
-  font-size: 0.86rem;
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: #f8fafc;
+  line-height: 1.15;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
+}
+
+.seat-you-tag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.seat-chips {
+  margin-top: 5px;
+  font-size: 0.84rem;
+  color: var(--gold);
+  font-weight: 800;
+  background: rgba(7, 19, 33, 0.86);
+  border: 1px solid rgba(245, 185, 66, 0.38);
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+
+.seat-status {
+  margin-top: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(11, 25, 44, 0.88);
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 2;
 }
 
 .turn-timer-text {
-  font-size: 0.72rem;
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  z-index: 6;
+  font-size: 0.7rem;
   font-weight: 800;
   color: var(--gold);
-  background: rgba(0, 0, 0, 0.45);
+  background: #0f172a;
+  border: 1.5px solid var(--gold);
   padding: 1px 6px;
-  border-radius: 6px;
+  border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
 }
 
 .turn-timer-text.urgent {
   color: #fff;
   background: var(--red);
-}
-
-.seat-chips {
-  font-size: 0.82rem;
-  color: var(--gold);
-  font-weight: 700;
-}
-
-.seat-status {
-  font-size: 0.72rem;
-  color: #38bdf8;
-  text-transform: uppercase;
-  margin-top: 2px;
-  min-height: 14px;
-}
-
-.turn-timer-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.turn-timer-fill {
-  height: 100%;
-  width: 100%;
-  background: #22c55e;
-  transition: width 0.1s linear, background-color 0.2s ease;
+  border-color: #fff;
 }
 
 .dealer-chip {
   position: absolute;
-  top: -10px;
-  right: -10px;
+  top: -4px;
+  right: -4px;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -808,7 +836,8 @@ input[type="text"]:focus {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--gold);
-  z-index: 5;
+  z-index: 6;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
 }
 
 .bet-pill {
@@ -881,7 +910,7 @@ input[type="text"]:focus {
     height: 92px;
   }
   .table-area {
-    padding: 4.5rem 2.6rem 4.2rem;
+    padding: 4.5rem 2.6rem 4.5rem;
   }
   .poker-table {
     width: 78vw;
@@ -893,14 +922,25 @@ input[type="text"]:focus {
     height: 54px;
   }
   .seat {
-    width: 108px;
+    width: 84px;
   }
-  .seat-0 { left: 28%; top: 115%; }
+  .seat-ring {
+    width: 62px;
+    height: 62px;
+  }
+  .seat-name {
+    font-size: 0.7rem;
+  }
+  .seat-chips {
+    font-size: 0.72rem;
+    padding: 1px 7px;
+  }
+  .seat-0 { left: 28%; top: 116%; }
   .seat-1 { left: -7%; top: 52%; }
-  .seat-2 { left: 14%; top: -12%; }
-  .seat-3 { left: 86%; top: -12%; }
+  .seat-2 { left: 14%; top: -13%; }
+  .seat-3 { left: 86%; top: -13%; }
   .seat-4 { left: 107%; top: 52%; }
-  .seat-5 { left: 72%; top: 115%; }
+  .seat-5 { left: 72%; top: 116%; }
   .card {
     width: 42px;
     height: 60px;
