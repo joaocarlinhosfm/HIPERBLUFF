@@ -1439,48 +1439,57 @@ $("btn-leave").addEventListener("click", async () => {
 /* ============================================================================
    11. INSTALAÇÃO PWA (ANDROID + IPHONE)
    ============================================================================ */
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
-}
-
-let deferredInstallPrompt = null;
+let deferredInstallPrompt = window.__deferredInstallPrompt || null;
 const installBtn = $("btn-install-app");
 const iosModal = $("ios-install-modal");
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.matchMedia("(display-mode: fullscreen)").matches ||
   window.navigator.standalone === true;
 
-if (isIOS && !isStandalone && installBtn) {
-  installBtn.classList.remove("hidden");
+function syncInstallButton() {
+  if (!installBtn || isStandalone) return;
+  if (deferredInstallPrompt || isIOS || isMobile) {
+    installBtn.classList.remove("hidden");
+  }
 }
+
+syncInstallButton();
+
+window.addEventListener("hiperbluff:install-ready", () => {
+  deferredInstallPrompt = window.__deferredInstallPrompt;
+  syncInstallButton();
+});
 
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  if (installBtn && !isStandalone) {
-    installBtn.classList.remove("hidden");
-  }
+  window.__deferredInstallPrompt = e;
+  syncInstallButton();
 });
 
 window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
+  window.__deferredInstallPrompt = null;
   if (installBtn) installBtn.classList.add("hidden");
 });
 
 if (installBtn) {
   installBtn.addEventListener("click", async () => {
-    if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      const { outcome } = await deferredInstallPrompt.userChoice;
+    const promptEvent = deferredInstallPrompt || window.__deferredInstallPrompt;
+    if (promptEvent) {
+      promptEvent.prompt();
+      const { outcome } = await promptEvent.userChoice;
       if (outcome === "accepted") installBtn.classList.add("hidden");
       deferredInstallPrompt = null;
+      window.__deferredInstallPrompt = null;
     } else if (isIOS && iosModal) {
       iosModal.classList.remove("hidden");
+    } else {
+      showError("No Chrome, toca no menu (⋮) no canto superior direito e escolhe \"Instalar aplicação\" ou \"Adicionar ao ecrã principal\".");
     }
   });
 }
@@ -1492,7 +1501,6 @@ if (closeIosBtn && iosModal) {
     if (e.target === iosModal) iosModal.classList.add("hidden");
   });
 }
-
 /* ============================================================================
    12. FULLSCREEN NATIVO, ORIENTAÇÃO LANDSCAPE E BLOQUEIO DE ZOOM (MOBILE)
    ============================================================================ */
