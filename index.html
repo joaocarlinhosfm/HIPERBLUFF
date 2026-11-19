@@ -56,24 +56,34 @@
         <button id="btn-mute" class="btn btn-icon" title="Silenciar / Ativar som">🔊</button>
         <button id="btn-start-game" class="btn btn-primary btn-sm hidden">Iniciar Mão</button>
         <button id="btn-leave" class="btn btn-danger btn-sm">Sair</button>
-        <button id="btn-start-game" class="btn btn-primary btn-sm hidden">Iniciar Mão</button>
-        <button id="btn-leave" class="btn btn-danger btn-sm">Sair</button>
       </div>
     </header>
 
     <main class="table-area">
       <div class="poker-table">
-        <!-- Centro da mesa: Pote e Cartas Comunitárias -->
+        <!-- Centro da mesa: Dealer Fixa, Pote com Fichas e Cartas Comunitárias -->
         <div class="table-center">
-          <div class="pot-display">
-            <span class="pot-label">POTE</span>
-            <span id="pot-amount">0</span> €
+          <div class="dealer-station">
+            <div class="dealer-avatar" title="Dealer da Mesa">🎩</div>
+            <div class="dealer-info">
+              <span class="dealer-tag">DEALER</span>
+              <div id="table-message" class="table-message">À espera de jogadores...</div>
+            </div>
+            <div id="next-hand-countdown" class="next-hand-pill hidden">5s</div>
           </div>
+
+          <div class="pot-zone">
+            <div id="pot-chips" class="pot-chips"></div>
+            <div class="pot-display">
+              <span class="pot-label">POTE</span>
+              <span id="pot-amount">0</span> €
+            </div>
+          </div>
+
           <div id="community-cards" class="community-cards"></div>
-          <div id="table-message" class="table-message">À espera de jogadores...</div>
         </div>
 
-        <!-- 6 Lugares em volta da mesa -->
+        <!-- 6 Lugares simétricos em volta da mesa -->
         <div id="seats-container" class="seats-container">
           <div class="seat seat-0" data-seat="0"></div>
           <div class="seat seat-1" data-seat="1"></div>
