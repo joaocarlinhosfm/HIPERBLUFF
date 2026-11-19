@@ -12,7 +12,7 @@ const firebaseConfig = {
 };
 
 let db = null;
-const isFirebaseConfigured = firebaseConfig.apiKey !== "SUA_API_KEY";
+const isFirebaseConfigured = firebaseConfig.apiKey !== "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk";
 if (isFirebaseConfigured) {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
@@ -23,7 +23,6 @@ if (isFirebaseConfigured) {
    ============================================================================ */
 const SoundEngine = {
   ctx: null,
-  muted: false,
 
   init() {
     if (!this.ctx) {
@@ -35,13 +34,8 @@ const SoundEngine = {
     }
   },
 
-  toggleMute() {
-    this.muted = !this.muted;
-    return this.muted;
-  },
-
   playNoise(duration, filterType, freqStart, freqEnd, gainPeak, delay = 0) {
-    if (this.muted || !this.ctx) return;
+    if (!this.ctx) return;
     const now = this.ctx.currentTime + delay;
     const bufferSize = Math.floor(this.ctx.sampleRate * duration);
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -71,7 +65,7 @@ const SoundEngine = {
   },
 
   playTone(freqStart, freqEnd, duration, type, gainPeak, delay = 0) {
-    if (this.muted || !this.ctx) return;
+    if (!this.ctx) return;
     const now = this.ctx.currentTime + delay;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -184,6 +178,7 @@ const BIG_BLIND = 20;
 const TURN_DURATION_MS = 20000;
 const NEXT_HAND_DELAY_MS = 6000;
 const AUTO_START_DELAY_MS = 10000;
+const RUNOUT_STEP_MS = 1300;
 
 function cardKey(card) {
   return card ? `${card.rank}_${card.suit}` : "";
@@ -220,7 +215,7 @@ function shuffleDeck(deck) {
 }
 
 /* ============================================================================
-   4. AVALIADOR OFICIAL DE MÃOS (DEVOLVE AS 5 CARTAS VENCEDORAS + KICKERS)
+   4. AVALIADOR OFICIAL DE MÃOS (5 DE 7 CARTAS + KICKERS) E SIDE POTS
    ============================================================================ */
 function scoreFiveCards(cards) {
   const values = cards.map(c => c.rank).sort((a, b) => b - a);
@@ -296,6 +291,46 @@ function evaluateBestHand(cards) {
   return best;
 }
 
+function buildSidePots(players) {
+  const contributors = (players || []).filter(p => p.totalBet > 0);
+  if (contributors.length === 0) return [];
+
+  const levels = [...new Set(contributors.map(p => p.totalBet))].sort((a, b) => a - b);
+  const pots = [];
+  let prevLevel = 0;
+
+  for (const level of levels) {
+    const slice = level - prevLevel;
+    if (slice <= 0) continue;
+
+    let amount = 0;
+    const eligibleIds = [];
+    for (const p of contributors) {
+      if (p.totalBet >= level) {
+        amount += slice;
+        if (!p.folded) eligibleIds.push(p.id);
+      }
+    }
+
+    if (amount > 0) {
+      const lastPot = pots[pots.length - 1];
+      const sameEligible =
+        lastPot &&
+        lastPot.eligibleIds.length === eligibleIds.length &&
+        lastPot.eligibleIds.every((id, idx) => id === eligibleIds[idx]);
+
+      if (sameEligible) {
+        lastPot.amount += amount;
+      } else {
+        pots.push({ amount, eligibleIds });
+      }
+    }
+    prevLevel = level;
+  }
+
+  return pots;
+}
+
 /* ============================================================================
    5. NORMALIZAÇÃO DO ESTADO (CORRIGE ARRAYS VAZIOS APAGADOS PELO FIREBASE)
    ============================================================================ */
@@ -315,6 +350,8 @@ function normalizeRoomState(raw) {
     turnIndex: raw.turnIndex !== undefined ? Number(raw.turnIndex) : -1,
     turnDeadline: Number(raw.turnDeadline) || 0,
     nextHandDeadline: Number(raw.nextHandDeadline) || 0,
+    isRunout: Boolean(raw.isRunout),
+    runoutDeadline: Number(raw.runoutDeadline) || 0,
     lastEvent: raw.lastEvent || null,
     winnerIds: Array.isArray(raw.winnerIds) ? raw.winnerIds : Object.values(raw.winnerIds || {}),
     winningHandName: raw.winningHandName || "",
@@ -327,6 +364,7 @@ function normalizeRoomState(raw) {
       name: p.name || "Jogador",
       chips: Number(p.chips) || 0,
       bet: Number(p.bet) || 0,
+      totalBet: Number(p.totalBet) || 0,
       hand: Array.isArray(p.hand) ? p.hand : Object.values(p.hand || {}),
       folded: Boolean(p.folded),
       allIn: Boolean(p.allIn),
@@ -351,6 +389,7 @@ let isSyncingAction = false;
 let timerInterval = null;
 let lastHandledTurnDeadline = 0;
 let lastHandledNextHandDeadline = 0;
+let lastHandledRunoutDeadline = 0;
 let lastPlayedEventTs = 0;
 let lastTickKey = "";
 let wasMyTurn = false;
@@ -376,6 +415,8 @@ function createInitialRoom(hostId, hostName) {
     turnIndex: -1,
     turnDeadline: 0,
     nextHandDeadline: 0,
+    isRunout: false,
+    runoutDeadline: 0,
     lastEvent: null,
     winnerIds: [],
     winningHandName: "",
@@ -384,7 +425,7 @@ function createInitialRoom(hostId, hostName) {
     community: [],
     message: "A aguardar jogadores... Partilha o código da sala!",
     players: [
-      { id: hostId, name: hostName, chips: STARTING_CHIPS, bet: 0, hand: [], folded: false, allIn: false, acted: false, isBot: false, status: "PRONTO" }
+      { id: hostId, name: hostName, chips: STARTING_CHIPS, bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false, isBot: false, status: "PRONTO" }
     ]
   };
 }
@@ -428,7 +469,17 @@ function tickTimers() {
   const now = Date.now();
   const isHost = roomState.hostId === myId;
 
-  // 1. Temporizador de Jogada Ativa (Anel Circular)
+  // 1. Run-out progressivo de All-In (suspense entre Flop / Turn / River / Showdown)
+  if (roomState.isRunout && roomState.runoutDeadline > 0) {
+    if (now >= roomState.runoutDeadline && isHost && lastHandledRunoutDeadline !== roomState.runoutDeadline) {
+      lastHandledRunoutDeadline = roomState.runoutDeadline;
+      const nextState = normalizeRoomState(structuredClone(roomState));
+      advancePhase(nextState);
+    }
+    return;
+  }
+
+  // 2. Temporizador de Jogada Ativa (Anel Circular)
   if (roomState.turnIndex >= 0 && roomState.turnDeadline > 0) {
     const remainingMs = Math.max(0, roomState.turnDeadline - now);
     const pct = Math.min(100, (remainingMs / TURN_DURATION_MS) * 100);
@@ -463,7 +514,7 @@ function tickTimers() {
     }
   }
 
-  // 2. Temporizador Automático (Início da Sala após 2.º jogador OU Próxima Mão)
+  // 3. Temporizador Automático (Início da Sala após 2.º jogador OU Próxima Mão)
   const nextPill = $("next-hand-countdown");
   const isWaitingCountdown =
     roomState.phase === "WAITING" &&
@@ -505,15 +556,17 @@ function tickTimers() {
 }
 
 /* ============================================================================
-   7. LÓGICA DO TEXAS HOLD'EM (BLINDS, RONDAS, AÇÕES, SHOWDOWN)
+   7. LÓGICA DO TEXAS HOLD'EM (BLINDS, RONDAS, AÇÕES, SIDE POTS, RUN-OUT)
    ============================================================================ */
 function startNewHand() {
   const s = normalizeRoomState(structuredClone(roomState));
   const eligible = s.players.filter(p => p.chips > 0);
   if (eligible.length < 2) {
-    s.message = "Fim do torneio! Menos de 2 jogadores com fichas.";
+    s.message = "Fim do torneio! Faz Rebuy ou inicia Nova Partida.";
     s.nextHandDeadline = 0;
     s.turnDeadline = 0;
+    s.isRunout = false;
+    s.runoutDeadline = 0;
     syncState(s);
     return;
   }
@@ -523,6 +576,8 @@ function startNewHand() {
   s.pot = 0;
   s.phase = "PREFLOP";
   s.nextHandDeadline = 0;
+  s.isRunout = false;
+  s.runoutDeadline = 0;
   s.winnerIds = [];
   s.winningHandName = "";
   s.winningCards = [];
@@ -539,6 +594,7 @@ function startNewHand() {
 
   s.players.forEach(p => {
     p.bet = 0;
+    p.totalBet = 0;
     p.folded = p.chips <= 0;
     p.allIn = false;
     p.acted = false;
@@ -565,7 +621,14 @@ function startNewHand() {
     firstToAct === -1 ||
     (canActAfterBlinds.length <= 1 && canActAfterBlinds.every(p => p.bet >= s.currentBet))
   ) {
-    advancePhase(s);
+    refundUncalledBet(s);
+    s.isRunout = true;
+    s.turnIndex = -1;
+    s.turnDeadline = 0;
+    s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+    s.message = "ALL-IN nas Blinds! A revelar cartas...";
+    setSoundEvent(s, "shuffle");
+    syncState(s);
     return;
   }
 
@@ -576,11 +639,69 @@ function startNewHand() {
   syncState(s);
 }
 
+function startNewMatchReset() {
+  if (!roomState || roomState.hostId !== myId) return;
+  const s = normalizeRoomState(structuredClone(roomState));
+  s.players.forEach(p => {
+    p.chips = STARTING_CHIPS;
+    p.bet = 0;
+    p.totalBet = 0;
+    p.folded = false;
+    p.allIn = false;
+    p.acted = false;
+    p.status = "PRONTO";
+  });
+  roomState = s;
+  startNewHand();
+}
+
+async function performRebuy() {
+  if (!roomState) return;
+  const myIdx = roomState.players.findIndex(p => p.id === myId);
+  if (myIdx < 0) return;
+  const me = roomState.players[myIdx];
+  if (me.chips > 0) return;
+
+  const inActiveHand = roomState.phase !== "WAITING" && roomState.phase !== "SHOWDOWN";
+  const newStatus = inActiveHand ? "REBUY (PRÓX. MÃO)" : "REBUY";
+
+  if (localMode) {
+    const s = normalizeRoomState(structuredClone(roomState));
+    s.players[myIdx].chips = STARTING_CHIPS;
+    s.players[myIdx].status = newStatus;
+    if (!inActiveHand) {
+      s.players[myIdx].folded = false;
+      const alive = s.players.filter(pl => pl.chips > 0).length;
+      if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
+        s.nextHandDeadline = Date.now() + 3000;
+        s.message = `${me.name} fez Rebuy (+${STARTING_CHIPS}€)! Nova mão a começar...`;
+      }
+    }
+    setSoundEvent(s, "chip");
+    syncState(s);
+  } else if (db && currentRoomCode) {
+    const updates = {};
+    updates[`players/${myIdx}/chips`] = STARTING_CHIPS;
+    updates[`players/${myIdx}/status`] = newStatus;
+    if (!inActiveHand) {
+      updates[`players/${myIdx}/folded`] = false;
+      const aliveAfter = roomState.players.filter((pl, idx) => (idx === myIdx ? true : pl.chips > 0)).length;
+      if (roomState.phase === "SHOWDOWN" && aliveAfter >= 2 && roomState.nextHandDeadline === 0) {
+        updates["nextHandDeadline"] = Date.now() + 3000;
+        updates["message"] = `${me.name} fez Rebuy (+${STARTING_CHIPS}€)! Nova mão a começar...`;
+      }
+    }
+    SoundEngine.chip();
+    await update(ref(db, `rooms/${currentRoomCode}`), updates);
+  }
+}
+
 function postBlind(s, idx, amount, label) {
   const p = s.players[idx];
   const paid = Math.min(p.chips, amount);
   p.chips -= paid;
   p.bet += paid;
+  p.totalBet += paid;
   s.pot += paid;
   p.status = paid < amount ? `${label} ALL-IN` : label;
   if (p.chips === 0) p.allIn = true;
@@ -597,21 +718,24 @@ function nextActiveIndex(s, fromIdx) {
 }
 
 function refundUncalledBet(s) {
-  const active = s.players.filter(p => !p.folded);
-  if (active.length < 2) return;
-  const sorted = [...active].sort((a, b) => b.bet - a.bet);
+  const bettors = s.players.filter(p => p.bet > 0);
+  if (bettors.length < 2) return;
+  const sorted = [...bettors].sort((a, b) => b.bet - a.bet);
+  if (sorted[0].folded) return;
+
   const excess = sorted[0].bet - sorted[1].bet;
   if (excess > 0) {
     sorted[0].bet -= excess;
+    sorted[0].totalBet = Math.max(0, sorted[0].totalBet - excess);
     sorted[0].chips += excess;
-    s.pot -= excess;
+    s.pot = Math.max(0, s.pot - excess);
     if (sorted[0].chips > 0) sorted[0].allIn = false;
   }
 }
 
 function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
   if (isSyncingAction && !isTimeout) return;
-  if (!roomState) return;
+  if (!roomState || roomState.isRunout) return;
 
   const s = normalizeRoomState(structuredClone(roomState));
   const idx = s.turnIndex;
@@ -629,6 +753,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     const toCall = Math.max(0, Math.min(p.chips, s.currentBet - p.bet));
     p.chips -= toCall;
     p.bet += toCall;
+    p.totalBet += toCall;
     s.pot += toCall;
     if (p.chips === 0 && toCall > 0) {
       p.allIn = true;
@@ -649,6 +774,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     }
     p.chips -= needed;
     p.bet = newBet;
+    p.totalBet += needed;
     s.pot += needed;
     p.status = p.chips === 0 ? "ALL-IN" : `RAISE ${newBet}€`;
     soundType = p.chips === 0 ? "allin" : "chip";
@@ -656,6 +782,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
   } else if (action === "allin") {
     const push = p.chips;
     p.bet += push;
+    p.totalBet += push;
     s.pot += push;
     p.chips = 0;
     p.allIn = true;
@@ -680,6 +807,8 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     s.phase = "SHOWDOWN";
     s.turnIndex = -1;
     s.turnDeadline = 0;
+    s.isRunout = false;
+    s.runoutDeadline = 0;
     const stillAlive = s.players.filter(pl => pl.chips > 0).length >= 2;
     s.nextHandDeadline = stillAlive ? Date.now() + NEXT_HAND_DELAY_MS : 0;
     setSoundEvent(s, "win");
@@ -697,6 +826,26 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
 
   if (roundDone) {
     refundUncalledBet(s);
+    const canActNext = s.players.filter(pl => !pl.folded && !pl.allIn);
+
+    // Se entrou em All-In e ainda há cartas comunitárias por sair, inicia run-out com suspense
+    if (canActNext.length < 2 && s.phase !== "RIVER") {
+      s.players.forEach(pl => {
+        pl.bet = 0;
+        pl.acted = false;
+      });
+      s.currentBet = 0;
+      s.minRaise = BIG_BLIND;
+      s.turnIndex = -1;
+      s.turnDeadline = 0;
+      s.isRunout = true;
+      s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+      s.message = "ALL-IN! A revelar cartas...";
+      setSoundEvent(s, soundType);
+      syncState(s);
+      return;
+    }
+
     advancePhase(s);
   } else {
     const nextIdx = nextActiveIndex(s, idx);
@@ -744,16 +893,29 @@ function advancePhase(s) {
 
   const canAct = s.players.filter(p => !p.folded && !p.allIn);
   if (canAct.length < 2) {
-    advancePhase(s);
+    s.isRunout = true;
+    s.turnIndex = -1;
+    s.turnDeadline = 0;
+    s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+    s.message = `ALL-IN! ${s.phase} na mesa...`;
+    setSoundEvent(s, "card");
+    syncState(s);
     return;
   }
 
   const nextIdx = nextActiveIndex(s, s.dealerIndex);
   if (nextIdx === -1) {
-    advancePhase(s);
+    s.isRunout = true;
+    s.turnIndex = -1;
+    s.turnDeadline = 0;
+    s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+    setSoundEvent(s, "card");
+    syncState(s);
     return;
   }
 
+  s.isRunout = false;
+  s.runoutDeadline = 0;
   s.turnIndex = nextIdx;
   s.turnDeadline = Date.now() + TURN_DURATION_MS;
   s.message = `${s.phase} na mesa — Vez de ${s.players[s.turnIndex].name}.`;
@@ -765,34 +927,68 @@ function resolveShowdown(s) {
   s.phase = "SHOWDOWN";
   s.turnIndex = -1;
   s.turnDeadline = 0;
+  s.isRunout = false;
+  s.runoutDeadline = 0;
 
   const contenders = s.players.filter(p => !p.folded);
-  let bestScore = -1;
-  let winners = [];
-  let winningCardSet = new Set();
-
+  const evalMap = new Map();
   for (const p of contenders) {
     const evalRes = evaluateBestHand([...(p.hand || []), ...(s.community || [])]);
     p.status = evalRes.name;
-    if (evalRes.score > bestScore) {
-      bestScore = evalRes.score;
-      winners = [p];
-      winningCardSet = new Set(evalRes.bestCards.map(cardKey));
-    } else if (evalRes.score === bestScore) {
-      winners.push(p);
-      evalRes.bestCards.forEach(c => winningCardSet.add(cardKey(c)));
-    }
+    evalMap.set(p.id, evalRes);
   }
 
-  const share = Math.floor(s.pot / winners.length);
-  const remainder = s.pot - share * winners.length;
-  winners.forEach((w, i) => { w.chips += share + (i === 0 ? remainder : 0); });
-  const names = winners.map(w => w.name).join(" & ");
+  let pots = buildSidePots(s.players);
+  if (pots.length === 0 && s.pot > 0) {
+    pots = [{ amount: s.pot, eligibleIds: contenders.map(p => p.id) }];
+  }
 
-  s.winnerIds = winners.map(w => w.id);
-  s.winningHandName = winners[0].status;
-  s.winningCards = [...winningCardSet];
-  s.message = `🏆 ${names} venceu ${s.pot}€ (${winners[0].status})!`;
+  const allWinnerIds = new Set();
+  const potSummaries = [];
+  let mainWinningHandName = "";
+  let mainWinningCardSet = new Set();
+
+  pots.forEach((pot, potIndex) => {
+    const eligible = contenders.filter(p => pot.eligibleIds.includes(p.id));
+    const pool = eligible.length > 0 ? eligible : contenders;
+
+    let bestScore = -1;
+    let potWinners = [];
+    let cardSet = new Set();
+
+    for (const p of pool) {
+      const res = evalMap.get(p.id);
+      if (res.score > bestScore) {
+        bestScore = res.score;
+        potWinners = [p];
+        cardSet = new Set(res.bestCards.map(cardKey));
+      } else if (res.score === bestScore) {
+        potWinners.push(p);
+        res.bestCards.forEach(c => cardSet.add(cardKey(c)));
+      }
+    }
+
+    const share = Math.floor(pot.amount / potWinners.length);
+    const remainder = pot.amount - share * potWinners.length;
+    potWinners.forEach((w, i) => {
+      w.chips += share + (i === 0 ? remainder : 0);
+      allWinnerIds.add(w.id);
+    });
+
+    const names = potWinners.map(w => w.name).join(" & ");
+    if (potIndex === 0) {
+      mainWinningHandName = potWinners[0].status;
+      mainWinningCardSet = cardSet;
+      potSummaries.push(`${names} +${pot.amount}€ (${potWinners[0].status})`);
+    } else {
+      potSummaries.push(`Side Pot: ${names} +${pot.amount}€`);
+    }
+  });
+
+  s.winnerIds = [...allWinnerIds];
+  s.winningHandName = mainWinningHandName;
+  s.winningCards = [...mainWinningCardSet];
+  s.message = `🏆 ${potSummaries.join(" • ")}`;
 
   const stillAlive = s.players.filter(pl => pl.chips > 0).length >= 2;
   s.nextHandDeadline = stillAlive ? Date.now() + NEXT_HAND_DELAY_MS : 0;
@@ -804,13 +1000,13 @@ function resolveShowdown(s) {
    8. BOTS PARA MODO TESTE OFFLINE
    ============================================================================ */
 function maybeTriggerBotTurn() {
-  if (!localMode || !roomState || roomState.turnIndex < 0) return;
+  if (!localMode || !roomState || roomState.isRunout || roomState.turnIndex < 0) return;
   const current = roomState.players[roomState.turnIndex];
   if (!current || !current.isBot) return;
 
   const delay = 900 + secureRandomInt(900);
   setTimeout(() => {
-    if (!roomState || roomState.turnIndex < 0) return;
+    if (!roomState || roomState.isRunout || roomState.turnIndex < 0) return;
     const p = roomState.players[roomState.turnIndex];
     if (!p || !p.isBot) return;
 
@@ -890,21 +1086,47 @@ function renderGame() {
   const players = roomState.players || [];
   const community = roomState.community || [];
   const isShowdown = roomState.phase === "SHOWDOWN";
+  const isWaiting = roomState.phase === "WAITING";
   const winCardsSet = new Set(roomState.winningCards || []);
   const winnerIdsSet = new Set(roomState.winnerIds || []);
   const hasCardHighlights = isShowdown && winCardsSet.size > 0;
 
   $("display-room-code").textContent = currentRoomCode || "DEMO";
-  $("display-phase").textContent = roomState.phase === "WAITING" ? "A AGUARDAR" : roomState.phase;
+  $("display-phase").textContent = isWaiting ? "A AGUARDAR" : roomState.phase;
   $("pot-amount").textContent = roomState.pot;
   $("pot-chips").innerHTML = renderPotChipsHTML(roomState.pot);
   $("table-message").textContent = roomState.message;
 
+  // Etiqueta discreta do código da sala durante espera online (útil em Fullscreen sem header)
+  const waitingPill = $("waiting-room-pill");
+  if (waitingPill) {
+    const showWaitingCode = isWaiting && !localMode && Boolean(currentRoomCode);
+    waitingPill.classList.toggle("hidden", !showWaitingCode);
+    if (showWaitingCode) $("waiting-room-code").textContent = currentRoomCode;
+  }
+
+  // Side Pots visíveis quando há 2+ potes ativos na mão
+  const sidePotsEl = $("side-pots-display");
+  if (sidePotsEl) {
+    const sidePots = buildSidePots(players);
+    if (sidePots.length > 1 && !isWaiting) {
+      sidePotsEl.innerHTML = sidePots
+        .map((sp, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${sp.amount}€</span>`)
+        .join("");
+      sidePotsEl.classList.remove("hidden");
+    } else {
+      sidePotsEl.classList.add("hidden");
+    }
+  }
+
   const isHost = roomState.hostId === myId;
-  const hasEnoughPlayers = players.length >= 2;
-  const canStart = isHost && hasEnoughPlayers && (roomState.phase === "WAITING" || isShowdown);
+  const fundedPlayers = players.filter(p => p.chips > 0).length;
+  const canStart = isHost && fundedPlayers >= 2 && (isWaiting || isShowdown);
   $("btn-start-game").classList.toggle("hidden", !canStart);
   $("btn-start-game").textContent = isShowdown ? "Saltar Espera" : "Começar Já";
+
+  const tournamentOver = isShowdown && fundedPlayers < 2;
+  $("btn-new-match").classList.toggle("hidden", !(isHost && tournamentOver));
 
   $("community-cards").innerHTML = community.map(c => {
     let hl = "";
@@ -948,22 +1170,22 @@ function renderGame() {
     const isTurn = roomState.turnIndex === pIdx;
     const isWinner = isShowdown && winnerIdsSet.has(p.id);
     const inHand = !p.folded && p.hand && p.hand.length === 2;
-    const showCards = isMe || (isShowdown && !p.folded && hasCardHighlights);
+    const revealOnRunout = roomState.isRunout && !p.folded;
+    const showCards = isMe || revealOnRunout || (isShowdown && !p.folded && hasCardHighlights);
+    const largeCards = isMe || isWinner || revealOnRunout;
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
 
-    // Cartas SEMPRE em cima e parcialmente escondidas atrás do círculo
     const cardsHTML = inHand
-      ? `<div class="seat-cards ${isMe || isWinner ? "my-cards" : "opp-cards"}">${p.hand.map(c => {
+      ? `<div class="seat-cards ${largeCards ? "my-cards" : "opp-cards"}">${p.hand.map(c => {
           let hl = "";
           if (hasCardHighlights && showCards) {
             hl = isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
           }
-          return renderCardHTML(c, !showCards, !(isMe || isWinner), hl);
+          return renderCardHTML(c, !showCards, !largeCards, hl);
         }).join("")}</div>`
       : "";
 
-    // Aposta da ronda posicionada em direção ao feltro da mesa
     const betHTML = p.bet > 0
       ? `<div class="seat-bet-zone"><div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div></div>`
       : "";
@@ -973,7 +1195,7 @@ function renderGame() {
       <div class="seat-avatar-stack">
         ${cardsHTML}
         <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
-          ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+          ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
           ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
           <div class="seat-circle">
             <div class="seat-name" title="${p.name}">${p.name}</div>
@@ -988,6 +1210,11 @@ function renderGame() {
   }
 
   const me = players[myIndex];
+
+  // Botão Rebuy para jogador sem fichas
+  const canRebuy = Boolean(me && me.chips === 0 && (me.folded || isShowdown || isWaiting));
+  $("btn-rebuy").classList.toggle("hidden", !canRebuy);
+
   if (me && !me.folded && me.hand && me.hand.length === 2) {
     const allCards = [...me.hand, ...community];
     const evalText = allCards.length >= 5 ? evaluateBestHand(allCards).name : "Pré-Flop";
@@ -996,7 +1223,7 @@ function renderGame() {
     $("hand-strength-badge").textContent = "A tua mão: —";
   }
 
-  const isMyTurn = Boolean(me && roomState.turnIndex === myIndex && !me.folded && !me.allIn);
+  const isMyTurn = Boolean(me && !roomState.isRunout && roomState.turnIndex === myIndex && !me.folded && !me.allIn);
   if (isMyTurn && !wasMyTurn) {
     setTimeout(() => SoundEngine.myTurn(), 180);
   }
@@ -1017,12 +1244,15 @@ function renderGame() {
 
     const slider = $("raise-slider");
     const raiseBtn = $("btn-raise");
+    const raiseRow = $("raise-row");
     slider.disabled = !canRaise;
     raiseBtn.disabled = !canRaise;
+    if (raiseRow) raiseRow.classList.toggle("disabled-raise", !canRaise);
 
     const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
     if (lastSliderTurnKey !== turnKey) {
       lastSliderTurnKey = turnKey;
+      slider.step = (maxRaiseTo - minRaiseTo) % 10 === 0 ? 10 : 1;
       slider.min = minRaiseTo;
       slider.max = maxRaiseTo;
       slider.value = minRaiseTo;
@@ -1034,7 +1264,7 @@ function renderGame() {
 }
 
 /* ============================================================================
-   10. EVENTOS DE LOBBY E CONTROLOS
+   10. EVENTOS DE LOBBY, APOSTAS RÁPIDAS E CONTROLOS
    ============================================================================ */
 function openGameScreen() {
   $("lobby-screen").classList.remove("active");
@@ -1046,12 +1276,38 @@ function showError(msg) {
   $("lobby-error").textContent = msg;
 }
 
-$("btn-mute").addEventListener("click", () => {
-  const muted = SoundEngine.toggleMute();
-  const btn = $("btn-mute");
-  btn.textContent = muted ? "🔇" : "🔊";
-  btn.classList.toggle("muted", muted);
-});
+function copyRoomCodeWithFeedback(btn) {
+  if (!currentRoomCode) return;
+  navigator.clipboard.writeText(currentRoomCode).catch(() => {});
+  const original = btn.textContent;
+  btn.textContent = "Copiado ✓";
+  setTimeout(() => { btn.textContent = original; }, 1400);
+}
+
+function setQuickRaise(mode) {
+  if (!roomState) return;
+  const me = roomState.players.find(p => p.id === myId);
+  if (!me) return;
+
+  const slider = $("raise-slider");
+  if (slider.disabled) return;
+
+  const minRaiseTo = Number(slider.min);
+  const maxRaiseTo = Number(slider.max);
+  const toCall = Math.max(0, roomState.currentBet - me.bet);
+  const potAfterCall = roomState.pot + toCall;
+
+  let target = minRaiseTo;
+  if (mode === "half") {
+    target = Math.round((roomState.currentBet + potAfterCall * 0.5) / 10) * 10;
+  } else if (mode === "pot") {
+    target = Math.round((roomState.currentBet + potAfterCall) / 10) * 10;
+  }
+
+  target = Math.max(minRaiseTo, Math.min(maxRaiseTo, target));
+  slider.value = target;
+  $("raise-value").textContent = target;
+}
 
 $("btn-create-room").addEventListener("click", async () => {
   SoundEngine.init();
@@ -1092,7 +1348,7 @@ $("btn-join-room").addEventListener("click", async () => {
   localMode = false;
   currentRoomCode = code;
   players.push({
-    id: myId, name: myName, chips: STARTING_CHIPS, bet: 0,
+    id: myId, name: myName, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
     hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false,
     status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
   });
@@ -1136,7 +1392,7 @@ $("btn-demo-mode").addEventListener("click", () => {
   const botNames = ["Tiago", "Marta", "Rui", "Inês", "Carlos"];
   botNames.forEach((name, i) => {
     demo.players.push({
-      id: `bot_${i}`, name, chips: STARTING_CHIPS, bet: 0,
+      id: `bot_${i}`, name, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
       hand: [], folded: false, allIn: false, acted: false, isBot: true, status: ""
     });
   });
@@ -1146,15 +1402,21 @@ $("btn-demo-mode").addEventListener("click", () => {
 });
 
 $("btn-start-game").addEventListener("click", startNewHand);
+$("btn-new-match").addEventListener("click", startNewMatchReset);
+$("btn-rebuy").addEventListener("click", performRebuy);
+
 $("btn-fold").addEventListener("click", () => handleAction(myId, "fold"));
 $("btn-check-call").addEventListener("click", () => handleAction(myId, "check-call"));
 $("btn-raise").addEventListener("click", () => handleAction(myId, "raise", Number($("raise-slider").value)));
 $("btn-allin").addEventListener("click", () => handleAction(myId, "allin"));
 $("raise-slider").addEventListener("input", (e) => { $("raise-value").textContent = e.target.value; });
 
-$("btn-copy-code").addEventListener("click", () => {
-  navigator.clipboard.writeText(currentRoomCode || "");
-});
+$("btn-bet-min").addEventListener("click", () => setQuickRaise("min"));
+$("btn-bet-half").addEventListener("click", () => setQuickRaise("half"));
+$("btn-bet-pot").addEventListener("click", () => setQuickRaise("pot"));
+
+$("btn-copy-code").addEventListener("click", (e) => copyRoomCodeWithFeedback(e.currentTarget));
+$("btn-waiting-copy").addEventListener("click", (e) => copyRoomCodeWithFeedback(e.currentTarget));
 
 $("btn-leave").addEventListener("click", async () => {
   if (!localMode && roomState && roomState.turnIndex >= 0) {
@@ -1169,6 +1431,9 @@ $("btn-leave").addEventListener("click", async () => {
   wasMyTurn = false;
   $("game-screen").classList.remove("active");
   $("lobby-screen").classList.add("active");
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    exitFullscreenMode();
+  }
 });
 
 /* ============================================================================
@@ -1185,7 +1450,10 @@ const installBtn = $("btn-install-app");
 const iosModal = $("ios-install-modal");
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+const isStandalone =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  window.matchMedia("(display-mode: fullscreen)").matches ||
+  window.navigator.standalone === true;
 
 if (isIOS && !isStandalone && installBtn) {
   installBtn.classList.remove("hidden");
@@ -1239,7 +1507,11 @@ const canUseFullscreen = Boolean(
 );
 
 function isInFullscreen() {
-  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  return Boolean(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    window.matchMedia("(display-mode: fullscreen)").matches
+  );
 }
 
 async function enterFullscreenLandscape() {
@@ -1255,6 +1527,7 @@ async function enterFullscreenLandscape() {
   if (screen.orientation && typeof screen.orientation.lock === "function") {
     screen.orientation.lock("landscape").catch(() => {});
   }
+  updateFullscreenState();
 }
 
 async function exitFullscreenMode() {
@@ -1271,14 +1544,12 @@ async function exitFullscreenMode() {
       screen.orientation.unlock();
     } catch (_) {}
   }
+  updateFullscreenState();
 }
 
-function updateFullscreenButton() {
-  if (!fullscreenBtn) return;
+function updateFullscreenState() {
   const active = isInFullscreen();
-  fullscreenBtn.textContent = active ? "⤫" : "⛶";
-  fullscreenBtn.title = active ? "Sair de ecrã inteiro" : "Ecrã inteiro";
-  fullscreenBtn.classList.toggle("active", active);
+  document.body.classList.toggle("is-fullscreen", active);
 }
 
 if (fullscreenBtn) {
@@ -1292,8 +1563,10 @@ if (fullscreenBtn) {
   }
 }
 
-document.addEventListener("fullscreenchange", updateFullscreenButton);
-document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+document.addEventListener("fullscreenchange", updateFullscreenState);
+document.addEventListener("webkitfullscreenchange", updateFullscreenState);
+window.addEventListener("resize", updateFullscreenState);
+updateFullscreenState();
 
 if (btnRotateLandscape) {
   btnRotateLandscape.addEventListener("click", () => {
