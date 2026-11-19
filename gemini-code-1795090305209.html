@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HIPERBLUFF — Poker Multiplayer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ECRÃ DE LOBBY -->
+  <div id="lobby-screen" class="screen active">
+    <div class="lobby-card">
+      <div class="brand">
+        <span class="brand-suit">♠</span>
+        <h1>HIPERBLUFF</h1>
+        <span class="brand-suit red">♥</span>
+      </div>
+      <p class="subtitle">Texas Hold'em • Mesa até 6 Jogadores</p>
+
+      <div class="form-group">
+        <label for="player-name">O teu nome na mesa</label>
+        <input type="text" id="player-name" maxlength="14" placeholder="Ex: João" />
+      </div>
+
+      <div class="lobby-actions">
+        <button id="btn-create-room" class="btn btn-primary">Criar Sala Online</button>
+      </div>
+
+      <div class="divider"><span>ou entrar numa sala</span></div>
+
+      <div class="join-row">
+        <input type="text" id="room-code" maxlength="6" placeholder="CÓDIGO" />
+        <button id="btn-join-room" class="btn btn-secondary">Entrar</button>
+      </div>
+
+      <div class="divider"><span>teste rápido offline</span></div>
+
+      <button id="btn-demo-mode" class="btn btn-outline">Jogar Agora (Mesa 6 Jogadores vs Bots)</button>
+      <p id="lobby-error" class="error-msg"></p>
+    </div>
+  </div>
+
+  <!-- ECRÃ DA MESA DE JOGO -->
+  <div id="game-screen" class="screen">
+    <header class="top-bar">
+      <div class="top-left">
+        <span class="logo-mini">♠ HIPERBLUFF</span>
+        <span id="display-phase" class="badge">AGUARDAR</span>
+      </div>
+      <div class="top-center">
+        <span>Sala: <strong id="display-room-code">----</strong></span>
+        <button id="btn-copy-code" class="btn-tiny" title="Copiar código">Copiar</button>
+      </div>
+      <div class="top-right">
+        <button id="btn-start-game" class="btn btn-primary btn-sm hidden">Iniciar Mão</button>
+        <button id="btn-leave" class="btn btn-danger btn-sm">Sair</button>
+      </div>
+    </header>
+
+    <main class="table-area">
+      <div class="poker-table">
+        <!-- Centro da mesa: Pote e Cartas Comunitárias -->
+        <div class="table-center">
+          <div class="pot-display">
+            <span class="pot-label">POTE</span>
+            <span id="pot-amount">0</span> €
+          </div>
+          <div id="community-cards" class="community-cards"></div>
+          <div id="table-message" class="table-message">À espera de jogadores...</div>
+        </div>
+
+        <!-- 6 Lugares em volta da mesa -->
+        <div id="seats-container" class="seats-container">
+          <div class="seat seat-0" data-seat="0"></div>
+          <div class="seat seat-1" data-seat="1"></div>
+          <div class="seat seat-2" data-seat="2"></div>
+          <div class="seat seat-3" data-seat="3"></div>
+          <div class="seat seat-4" data-seat="4"></div>
+          <div class="seat seat-5" data-seat="5"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Barra de Controlos do Jogador -->
+    <footer class="controls-bar">
+      <div id="hand-strength-badge" class="hand-strength">A tua mão: —</div>
+
+      <div id="action-bar" class="action-buttons disabled">
+        <button id="btn-fold" class="btn btn-fold">Fold</button>
+        <button id="btn-check-call" class="btn btn-call">Check</button>
+
+        <div class="raise-control">
+          <input type="range" id="raise-slider" min="20" max="1000" step="10" value="40" />
+          <button id="btn-raise" class="btn btn-raise">Raise <span id="raise-value">40</span>€</button>
+        </div>
+
+        <button id="btn-allin" class="btn btn-allin">All-In</button>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
