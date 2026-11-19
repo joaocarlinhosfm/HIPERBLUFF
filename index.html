@@ -89,30 +89,89 @@
 
     <main class="table-area">
       <div class="poker-table">
+        <!-- Linha de apostas interior e marca d'água no feltro -->
+        <div class="table-betting-line" aria-hidden="true"></div>
+        <div class="table-watermark" aria-hidden="true">❄ HIPERBLUFF ❄</div>
 
-        <!-- DEALER FIXA NO TOPO DA MESA -->
+        <!-- DEALER FIXA NO TOPO DA MESA (ILUSTRAÇÃO VETORIAL HD) -->
         <div class="dealer-seat">
           <div class="dealer-avatar-wrap">
-            <svg viewBox="0 0 100 100" class="dealer-svg" aria-label="Dealer">
+            <svg viewBox="0 0 120 120" class="dealer-svg" aria-label="Dealer">
               <defs>
-                <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#312e81"/>
-                  <stop offset="100%" stop-color="#0f172a"/>
+                <radialGradient id="dealerBg" cx="50%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#1e3a5f"/>
+                  <stop offset="100%" stop-color="#071321"/>
+                </radialGradient>
+                <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fcd34d"/>
+                  <stop offset="45%" stop-color="#d97706"/>
+                  <stop offset="100%" stop-color="#78350f"/>
+                </linearGradient>
+                <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ffedd5"/>
+                  <stop offset="100%" stop-color="#fed7aa"/>
+                </linearGradient>
+                <linearGradient id="vestGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#4338ca"/>
+                  <stop offset="100%" stop-color="#1e1b4b"/>
+                </linearGradient>
+                <linearGradient id="goldTie" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fef08a"/>
+                  <stop offset="100%" stop-color="#d97706"/>
                 </linearGradient>
               </defs>
-              <circle cx="50" cy="50" r="48" fill="url(#bgGrad)"/>
-              <path d="M26 48 C24 22, 76 22, 74 48 C76 62, 68 68, 64 62 L36 62 C32 68, 24 62, 26 48 Z" fill="#d97706"/>
-              <path d="M18 96 C22 72, 36 66, 50 66 C64 66, 78 72, 82 96 Z" fill="#f8fafc"/>
-              <path d="M31 69 L50 86 L69 69 L74 96 L26 96 Z" fill="#4c1d95"/>
-              <polygon points="43,69 50,73 43,77" fill="#f5b942"/>
-              <polygon points="57,69 50,73 57,77" fill="#f5b942"/>
-              <circle cx="50" cy="73" r="2.2" fill="#eab308"/>
-              <rect x="44" y="56" width="12" height="12" rx="4" fill="#fde2c4"/>
-              <ellipse cx="50" cy="43" rx="16" ry="18" fill="#fde2c4"/>
-              <path d="M34 38 C38 26, 62 26, 66 38 C60 31, 42 31, 34 38 Z" fill="#b45309"/>
-              <circle cx="44" cy="43" r="2" fill="#1e293b"/>
-              <circle cx="56" cy="43" r="2" fill="#1e293b"/>
-              <path d="M44 51 Q50 56 56 51" fill="none" stroke="#be123c" stroke-width="2" stroke-linecap="round"/>
+
+              <circle cx="60" cy="60" r="59" fill="url(#dealerBg)"/>
+              <!-- Brilho de fundo -->
+              <circle cx="60" cy="48" r="34" fill="rgba(56,189,248,0.14)"/>
+
+              <!-- Cabelo traseiro com volume -->
+              <path d="M29 54 C25 22, 95 22, 91 54 C94 72, 85 83, 76 76 L44 76 C35 83, 26 72, 29 54 Z" fill="url(#hairGrad)"/>
+
+              <!-- Camisa branca -->
+              <path d="M18 118 C22 86, 40 78, 60 78 C80 78, 98 86, 102 118 Z" fill="#f8fafc"/>
+              <path d="M44 78 L60 99 L76 78" fill="#e2e8f0"/>
+
+              <!-- Colete de Croupier com lapela e botões dourados -->
+              <path d="M35 81 L60 104 L85 81 L92 118 L28 118 Z" fill="url(#vestGrad)"/>
+              <path d="M35 81 L60 104 L55 110 L32 88 Z" fill="#312e81"/>
+              <path d="M85 81 L60 104 L65 110 L88 88 Z" fill="#312e81"/>
+              <circle cx="60" cy="109" r="2.2" fill="#f5b942"/>
+              <circle cx="60" cy="116" r="2.2" fill="#f5b942"/>
+
+              <!-- Crachá dourado no colete -->
+              <rect x="70" y="96" width="11" height="4.5" rx="1.5" fill="#f5b942"/>
+
+              <!-- Pescoço com sombra -->
+              <rect x="52" y="66" width="16" height="16" rx="6" fill="url(#skinGrad)"/>
+              <path d="M52 70 Q60 76 68 70 L68 75 Q60 80 52 75 Z" fill="rgba(180,83,9,0.2)"/>
+
+              <!-- Laço dourado -->
+              <polygon points="49,80 60,85 49,90" fill="url(#goldTie)"/>
+              <polygon points="71,80 60,85 71,90" fill="url(#goldTie)"/>
+              <circle cx="60" cy="85" r="3" fill="#fde047" stroke="#92400e" stroke-width="0.8"/>
+
+              <!-- Rosto -->
+              <ellipse cx="60" cy="50" rx="19" ry="22" fill="url(#skinGrad)"/>
+              <!-- Bochechas subtis -->
+              <ellipse cx="48" cy="55" rx="4" ry="2.2" fill="rgba(244,63,94,0.18)"/>
+              <ellipse cx="72" cy="55" rx="4" ry="2.2" fill="rgba(244,63,94,0.18)"/>
+
+              <!-- Olhos expressivos com brilho -->
+              <ellipse cx="52" cy="49" rx="2.7" ry="2.9" fill="#0f172a"/>
+              <ellipse cx="68" cy="49" rx="2.7" ry="2.9" fill="#0f172a"/>
+              <circle cx="51.2" cy="48" r="1" fill="#ffffff"/>
+              <circle cx="67.2" cy="48" r="1" fill="#ffffff"/>
+              <!-- Sobrancelhas -->
+              <path d="M47 44 Q52 41.5 56 44" fill="none" stroke="#92400e" stroke-width="1.6" stroke-linecap="round"/>
+              <path d="M64 44 Q68 41.5 73 44" fill="none" stroke="#92400e" stroke-width="1.6" stroke-linecap="round"/>
+              <!-- Nariz e sorriso -->
+              <path d="M59.5 52 Q60 55 61.5 55" fill="none" stroke="rgba(180,83,9,0.45)" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M53 60 Q60 66 67 60" fill="none" stroke="#be123c" stroke-width="2.2" stroke-linecap="round"/>
+
+              <!-- Franja estilizada com brilho -->
+              <path d="M39 45 C42 25, 78 25, 81 45 C72 34, 52 33, 39 45 Z" fill="url(#hairGrad)"/>
+              <path d="M47 32 Q60 28 73 33" fill="none" stroke="rgba(254,243,199,0.6)" stroke-width="1.8" stroke-linecap="round"/>
             </svg>
           </div>
           <div class="dealer-plate">
