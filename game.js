@@ -919,4 +919,60 @@ $("btn-leave").addEventListener("click", () => {
   wasMyTurn = false;
   $("game-screen").classList.remove("active");
   $("lobby-screen").classList.add("active");
+}
+   /* ============================================================================
+   10. INSTALAÇÃO PWA (ANDROID + IPHONE)
+   ============================================================================ */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+let deferredInstallPrompt = null;
+const installBtn = $("btn-install-app");
+const iosModal = $("ios-install-modal");
+
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+// No iPhone (Safari), mostrar o botão se ainda não estiver instalada
+if (isIOS && !isStandalone && installBtn) {
+  installBtn.classList.remove("hidden");
+}
+
+// No Android (Chrome/Edge), guardar o evento nativo de instalação
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (installBtn && !isStandalone) {
+    installBtn.classList.remove("hidden");
+  }
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  if (installBtn) installBtn.classList.add("hidden");
+});
+
+if (installBtn) {
+  installBtn.addEventListener("click", async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === "accepted") installBtn.classList.add("hidden");
+      deferredInstallPrompt = null;
+    } else if (isIOS && iosModal) {
+      iosModal.classList.remove("hidden");
+    }
+  });
+}
+
+const closeIosBtn = $("btn-close-ios-modal");
+if (closeIosBtn && iosModal) {
+  closeIosBtn.addEventListener("click", () => iosModal.classList.add("hidden"));
+  iosModal.addEventListener("click", (e) => {
+    if (e.target === iosModal) iosModal.classList.add("hidden");
+  });
+}
 });
