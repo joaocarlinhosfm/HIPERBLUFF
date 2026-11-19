@@ -828,7 +828,7 @@ function maybeTriggerBotTurn() {
 }
 
 /* ============================================================================
-   9. RENDERIZAÇÃO DA INTERFACE, HIGHLIGHT DE VITÓRIA E DISPARO DE SONS
+   9. RENDERIZAÇÃO DA INTERFACE, ASSETS HD E HIGHLIGHT DE VITÓRIA
    ============================================================================ */
 function renderPotChipsHTML(amount) {
   if (!amount || amount <= 0) return "";
@@ -856,13 +856,25 @@ function renderPotChipsHTML(amount) {
 
 function renderCardHTML(card, hidden = false, small = false, highlightClass = "") {
   const sizeClass = small ? "small" : "";
-  if (hidden || !card) return `<div class="card back ${sizeClass}"></div>`;
+  if (hidden || !card) {
+    return `
+      <div class="card back ${sizeClass}">
+        <div class="card-back-inner"><span class="card-back-emblem">❄</span></div>
+      </div>
+    `;
+  }
   const isRed = card.suit === "♥" || card.suit === "♦" ? "red" : "";
   return `
     <div class="card ${isRed} ${sizeClass} ${highlightClass}">
-      <div class="card-top">${card.label}${card.suit}</div>
+      <div class="card-corner top">
+        <span class="card-rank">${card.label}</span>
+        <span class="card-suit-mini">${card.suit}</span>
+      </div>
       <div class="card-center">${card.suit}</div>
-      <div class="card-bottom">${card.label}${card.suit}</div>
+      <div class="card-corner bottom">
+        <span class="card-rank">${card.label}</span>
+        <span class="card-suit-mini">${card.suit}</span>
+      </div>
     </div>
   `;
 }
@@ -894,7 +906,6 @@ function renderGame() {
   $("btn-start-game").classList.toggle("hidden", !canStart);
   $("btn-start-game").textContent = isShowdown ? "Saltar Espera" : "Começar Já";
 
-  // Cartas comunitárias com destaque nas cartas da combinação vencedora
   $("community-cards").innerHTML = community.map(c => {
     let hl = "";
     if (hasCardHighlights) {
@@ -903,7 +914,6 @@ function renderGame() {
     return renderCardHTML(c, false, false, hl);
   }).join("");
 
-  // Banner central da mão vencedora (ex: FULL HOUSE)
   const bannerEl = $("winning-hand-banner");
   if (bannerEl) {
     if (isShowdown && roomState.winningHandName) {
@@ -942,6 +952,7 @@ function renderGame() {
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
 
+    // Cartas SEMPRE em cima e parcialmente escondidas atrás do círculo
     const cardsHTML = inHand
       ? `<div class="seat-cards ${isMe || isWinner ? "my-cards" : "opp-cards"}">${p.hand.map(c => {
           let hl = "";
@@ -952,21 +963,24 @@ function renderGame() {
         }).join("")}</div>`
       : "";
 
-    const betHTML = p.bet > 0 ? `<div class="bet-pill">${p.bet} €</div>` : "";
-    const tableOverlayHTML = (cardsHTML || betHTML)
-      ? `<div class="seat-table-zone">${cardsHTML}${betHTML}</div>`
+    // Aposta da ronda posicionada em direção ao feltro da mesa
+    const betHTML = p.bet > 0
+      ? `<div class="seat-bet-zone"><div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div></div>`
       : "";
 
     el.innerHTML = `
-      ${tableOverlayHTML}
-      <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
-        ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
-        ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
-        <div class="seat-circle">
-          <div class="seat-name" title="${p.name}">${p.name}</div>
-          ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
+      ${betHTML}
+      <div class="seat-avatar-stack">
+        ${cardsHTML}
+        <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
+          ${roomState.dealerIndex === pIdx && roomState.phase !== "WAITING" ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+          ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+          <div class="seat-circle">
+            <div class="seat-name" title="${p.name}">${p.name}</div>
+            ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
+          </div>
+          ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
         </div>
-        ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
       </div>
       <div class="seat-chips">${p.chips} €</div>
       ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}
