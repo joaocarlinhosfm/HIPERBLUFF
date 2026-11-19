@@ -1,11 +1,15 @@
 :root {
-  --bg-dark: #0b0f14;
-  --panel: #141b24;
-  --panel-border: #253244;
+  --bg-dark: #071321;
+  --panel: #102033;
+  --panel-border: #243b55;
   --felt-center: #145a3a;
   --felt-edge: #0a3320;
   --rail-wood: #2a1810;
   --gold: #f5b942;
+  --ice-bright: #e0f2fe;
+  --ice-cyan: #38bdf8;
+  --ice-deep: #0284c7;
+  --ice-border: rgba(125, 211, 252, 0.35);
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
   --red: #e11d48;
@@ -22,7 +26,7 @@
 }
 
 body {
-  background: radial-gradient(circle at top, #131c28, var(--bg-dark));
+  background: radial-gradient(circle at top, #10243d, var(--bg-dark));
   color: var(--text-main);
   min-height: 100vh;
   overflow: hidden;
@@ -44,76 +48,175 @@ body {
   display: none !important;
 }
 
-/* ================= LOBBY ================= */
+/* ================= LOBBY — TEMA FRIO / GLACIAL ================= */
 #lobby-screen {
+  position: relative;
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.22), transparent 45%),
+    radial-gradient(circle at 82% 80%, rgba(14, 165, 233, 0.18), transparent 45%),
+    radial-gradient(circle at 50% 0%, #102b4a 0%, #071321 62%, #030912 100%);
 }
 
+/* Neve e cristais de gelo animados */
+.snow-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.flake {
+  position: absolute;
+  top: -10%;
+  color: rgba(224, 242, 254, 0.72);
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+  animation: snowfall linear infinite;
+}
+
+.f1  { left: 6%;  font-size: 1.1rem; animation-duration: 11s; animation-delay: 0s;   opacity: 0.7; }
+.f2  { left: 14%; font-size: 0.7rem; animation-duration: 8s;  animation-delay: -3s;  opacity: 0.5; }
+.f3  { left: 23%; font-size: 1.3rem; animation-duration: 14s; animation-delay: -6s;  opacity: 0.6; }
+.f4  { left: 32%; font-size: 0.6rem; animation-duration: 9s;  animation-delay: -1s;  opacity: 0.45; }
+.f5  { left: 42%; font-size: 0.9rem; animation-duration: 12s; animation-delay: -5s;  opacity: 0.65; }
+.f6  { left: 52%; font-size: 0.8rem; animation-duration: 10s; animation-delay: -2s;  opacity: 0.5; }
+.f7  { left: 62%; font-size: 1.2rem; animation-duration: 13s; animation-delay: -8s;  opacity: 0.7; }
+.f8  { left: 71%; font-size: 0.65rem; animation-duration: 7.5s; animation-delay: -4s; opacity: 0.5; }
+.f9  { left: 80%; font-size: 1.05rem; animation-duration: 11.5s; animation-delay: -7s; opacity: 0.65; }
+.f10 { left: 88%; font-size: 0.75rem; animation-duration: 9.5s; animation-delay: -2.5s; opacity: 0.45; }
+.f11 { left: 94%; font-size: 1.25rem; animation-duration: 15s; animation-delay: -9s; opacity: 0.6; }
+.f12 { left: 47%; font-size: 0.55rem; animation-duration: 8.5s; animation-delay: -4.5s; opacity: 0.4; }
+
+@keyframes snowfall {
+  0% {
+    transform: translateY(-5vh) translateX(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(50vh) translateX(18px) rotate(180deg);
+  }
+  100% {
+    transform: translateY(112vh) translateX(-14px) rotate(360deg);
+  }
+}
+
+/* Cartão de Vidro Gelado (Frosted Glass) */
 .lobby-card {
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 18px;
-  padding: 2.2rem;
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(165deg, rgba(16, 39, 66, 0.84) 0%, rgba(8, 20, 36, 0.92) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--ice-border);
+  border-radius: 22px;
+  padding: 1.8rem 2rem 1.7rem;
   width: 100%;
-  max-width: 420px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  max-width: 425px;
+  box-shadow:
+    0 24px 65px rgba(0, 0, 0, 0.68),
+    0 0 38px rgba(56, 189, 248, 0.16),
+    inset 0 1px 0 rgba(224, 242, 254, 0.35);
   text-align: center;
+  overflow: hidden;
+}
+
+.frost-top-edge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #bae6fd, #38bdf8, #bae6fd, transparent);
+  opacity: 0.85;
+}
+
+.lobby-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.45rem;
+}
+
+.lobby-logo {
+  width: 112px;
+  height: 112px;
+  border-radius: 22px;
+  object-fit: cover;
+  border: 2px solid rgba(186, 230, 253, 0.45);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(56, 189, 248, 0.35);
 }
 
 .brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
 }
 
 .brand h1 {
   font-size: 2rem;
+  font-weight: 900;
   letter-spacing: 3px;
-  color: var(--gold);
+  background: linear-gradient(180deg, #ffffff 0%, #bae6fd 52%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(56, 189, 248, 0.45));
 }
 
 .brand-suit {
-  font-size: 1.8rem;
+  font-size: 1.55rem;
+  color: #bae6fd;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
 }
 
-.brand-suit.red {
-  color: var(--red);
+.brand-suit.ice {
+  color: #38bdf8;
 }
 
 .subtitle {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin: 0.4rem 0 1.8rem;
+  color: #93c5fd;
+  font-size: 0.88rem;
+  margin: 0.35rem 0 1.45rem;
+  letter-spacing: 0.4px;
 }
 
 .form-group {
   text-align: left;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.05rem;
 }
 
 .form-group label {
   display: block;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-bottom: 0.4rem;
+  font-size: 0.82rem;
+  color: #bae6fd;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
 }
 
 input[type="text"] {
   width: 100%;
-  padding: 0.8rem 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--panel-border);
-  background: #0d131a;
-  color: var(--text-main);
+  padding: 0.78rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  background: rgba(4, 12, 24, 0.82);
+  color: #f0f9ff;
   font-size: 1rem;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="text"]::placeholder {
+  color: #64748b;
 }
 
 input[type="text"]:focus {
-  border-color: var(--gold);
+  border-color: var(--ice-cyan);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
 }
 
 .join-row {
@@ -131,9 +234,12 @@ input[type="text"]:focus {
 .divider {
   display: flex;
   align-items: center;
-  margin: 1.2rem 0;
-  color: var(--text-muted);
-  font-size: 0.8rem;
+  margin: 1.05rem 0;
+  color: #7dd3fc;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.8;
 }
 
 .divider::before,
@@ -141,7 +247,7 @@ input[type="text"]:focus {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--panel-border);
+  background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.35), transparent);
 }
 
 .divider span {
@@ -149,26 +255,26 @@ input[type="text"]:focus {
 }
 
 .error-msg {
-  color: #fb7185;
-  font-size: 0.85rem;
-  margin-top: 0.9rem;
-  min-height: 1.2rem;
+  color: #fda4af;
+  font-size: 0.84rem;
+  margin-top: 0.75rem;
+  min-height: 1.15rem;
 }
 
 /* ================= BOTÕES ================= */
 .btn {
   border: none;
-  border-radius: 10px;
+  border-radius: 11px;
   padding: 0.8rem 1.2rem;
   font-weight: 700;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: transform 0.1s ease, filter 0.15s ease;
+  transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease;
   color: #fff;
 }
 
 .btn:hover:not(:disabled) {
-  filter: brightness(1.12);
+  filter: brightness(1.1);
 }
 
 .btn:active:not(:disabled) {
@@ -181,21 +287,28 @@ input[type="text"]:focus {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #eab308, #ca8a04);
-  color: #0f172a;
+  background: linear-gradient(135deg, #7dd3fc 0%, #0ea5e9 55%, #0369a1 100%);
+  color: #031525;
   width: 100%;
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .btn-secondary {
-  background: var(--blue);
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+  border: 1px solid rgba(147, 197, 253, 0.35);
   min-width: 105px;
 }
 
 .btn-outline {
-  background: transparent;
-  border: 1px solid var(--panel-border);
-  color: var(--text-main);
+  background: rgba(14, 37, 64, 0.55);
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  color: #e0f2fe;
   width: 100%;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(186, 230, 253, 0.6);
 }
 
 .btn-danger {
@@ -209,9 +322,9 @@ input[type="text"]:focus {
 }
 
 .btn-tiny {
-  background: #253244;
-  color: #fff;
-  border: none;
+  background: #1e3a5f;
+  color: #e0f2fe;
+  border: 1px solid rgba(125, 211, 252, 0.3);
   border-radius: 6px;
   padding: 0.25rem 0.6rem;
   font-size: 0.75rem;
@@ -220,7 +333,7 @@ input[type="text"]:focus {
 }
 
 .btn-icon {
-  background: #1e293b;
+  background: #132842;
   border: 1px solid var(--panel-border);
   padding: 0.4rem 0.65rem;
   font-size: 0.95rem;
@@ -237,8 +350,8 @@ input[type="text"]:focus {
   justify-content: space-between;
   align-items: center;
   padding: 0.7rem 1.4rem;
-  background: rgba(14, 20, 28, 0.92);
-  border-bottom: 1px solid var(--panel-border);
+  background: rgba(8, 20, 36, 0.94);
+  border-bottom: 1px solid rgba(125, 211, 252, 0.2);
   z-index: 10;
 }
 
@@ -253,12 +366,14 @@ input[type="text"]:focus {
 .logo-mini {
   font-weight: 800;
   letter-spacing: 2px;
-  color: var(--gold);
+  color: #bae6fd;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
 }
 
 .badge {
-  background: #1e293b;
+  background: #0f2942;
   color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
   padding: 0.25rem 0.6rem;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -508,13 +623,12 @@ input[type="text"]:focus {
   transition: opacity 0.25s ease;
 }
 
-/* Sentido horário: 2 em baixo, 2 nas laterais, 2 no topo a ladear a Dealer */
-.seat-0 { left: 32%; top: 103%; } /* Tu (baixo esquerda) */
-.seat-1 { left: 1%;  top: 52%;  } /* Esquerda meio */
-.seat-2 { left: 21%; top: 0%;   } /* Topo esquerda (junto à Dealer) */
-.seat-3 { left: 79%; top: 0%;   } /* Topo direita (junto à Dealer) */
-.seat-4 { left: 99%; top: 52%;  } /* Direita meio */
-.seat-5 { left: 68%; top: 103%; } /* Baixo direita */
+.seat-0 { left: 32%; top: 103%; }
+.seat-1 { left: 1%;  top: 52%;  }
+.seat-2 { left: 21%; top: 0%;   }
+.seat-3 { left: 79%; top: 0%;   }
+.seat-4 { left: 99%; top: 52%;  }
+.seat-5 { left: 68%; top: 103%; }
 
 .seat-cards {
   display: flex;
@@ -547,7 +661,7 @@ input[type="text"]:focus {
 
 .seat.empty .seat-box {
   border-style: dashed;
-  background: rgba(20, 27, 36, 0.5);
+  background: rgba(16, 32, 51, 0.55);
   color: var(--text-muted);
   font-size: 0.8rem;
 }
@@ -643,8 +757,8 @@ input[type="text"]:focus {
 
 /* ================= BARRA DE AÇÕES ================= */
 .controls-bar {
-  background: rgba(14, 20, 28, 0.96);
-  border-top: 1px solid var(--panel-border);
+  background: rgba(8, 20, 36, 0.96);
+  border-top: 1px solid rgba(125, 211, 252, 0.2);
   padding: 0.8rem 1.4rem;
   display: flex;
   justify-content: space-between;
@@ -680,17 +794,24 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #1e293b;
+  background: #132842;
   padding: 0.35rem 0.6rem;
   border-radius: 10px;
 }
 
 #raise-slider {
   width: 110px;
-  accent-color: var(--gold);
+  accent-color: var(--ice-cyan);
 }
 
 @media (max-width: 780px) {
+  .lobby-card {
+    padding: 1.4rem 1.25rem;
+  }
+  .lobby-logo {
+    width: 92px;
+    height: 92px;
+  }
   .table-area {
     padding: 4rem 1.5rem 3.5rem;
   }
@@ -716,18 +837,20 @@ input[type="text"]:focus {
   }
 }
 
-/* ================= BOTÃO INSTALAR PWA E MODAL IOS ================= */
+/* ================= BOTÃO INSTALAR PWA E MODAL IOS (TEMA FRIO) ================= */
 .btn-install {
   margin-top: 0.75rem;
   width: 100%;
-  background: linear-gradient(135deg, #16a34a, #15803d);
-  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  color: #f0fdfa;
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(3, 10, 20, 0.8);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -736,18 +859,18 @@ input[type="text"]:focus {
 }
 
 .modal-box {
-  background: var(--panel);
-  border: 1px solid var(--gold);
-  border-radius: 16px;
+  background: linear-gradient(165deg, #102742, #081526);
+  border: 1.5px solid var(--ice-cyan);
+  border-radius: 18px;
   padding: 1.5rem;
   max-width: 360px;
   width: 100%;
   text-align: center;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 28px rgba(56, 189, 248, 0.25);
 }
 
 .modal-box h3 {
-  color: var(--gold);
+  color: #bae6fd;
   margin-bottom: 1rem;
 }
 
