@@ -8,8 +8,8 @@ const CORE_ASSETS = [
   "./poker.js",
   "./user.js",
   "./icon-192.png",
-  "./icon-512.png"
-  "./manifest.json"
+  "./icon-512.png",
+  "./manifest.json",
 ];
 
 self.addEventListener("install", (event) => {
