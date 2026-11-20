@@ -2110,4 +2110,224 @@ body.is-fullscreen #game-screen #btn-leave {
     padding: 0.28rem 0.48rem;
     font-size: 0.7rem;
   }
+  /* ============================================================================
+   MESA 3D INCLINADA + FITA LED DINÂMICA (ESTILO ZYNGA)
+   ============================================================================ */
+:root {
+  --led-core: #38bdf8;
+  --led-bright: #bae6fd;
+  --led-glow-soft: rgba(56, 189, 248, 0.42);
+}
+
+/* Remove o aspeto 2D plano da caixa base (a mesa visível passa a ser .table-3d-body) */
+.poker-table {
+  width: min(740px, 66vw);
+  height: min(320px, 43dvh);
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.table-3d-stage {
+  position: absolute;
+  inset: 0;
+  perspective: 660px;
+  perspective-origin: 50% 34%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.table-3d-body {
+  position: absolute;
+  inset: -8% -2% 4% -2%;
+  border-radius: 215px;
+  transform: rotateX(28deg);
+  transform-origin: 50% 52%;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1) 0%, transparent 56%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.014) 0px, rgba(255, 255, 255, 0.014) 2px, transparent 2px, transparent 4px),
+    radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 60%, var(--felt-edge) 100%);
+  border: 17px solid #593823;
+  box-shadow:
+    /* Espessura 3D real da borda da mesa */
+    0 5px 0 #3d2415,
+    0 10px 0 #2b180e,
+    0 15px 0 #1b0f08,
+    /* Sombra no chão + reflexo difuso da fita LED */
+    0 26px 56px rgba(0, 0, 0, 0.88),
+    0 14px 36px var(--led-glow-soft),
+    /* Profundidade interior + brilho LED no feltro */
+    inset 0 0 60px rgba(0, 0, 0, 0.72),
+    inset 0 0 26px var(--led-glow-soft);
+  transition: box-shadow 0.65s ease;
+}
+
+/* Fita LED embutida por baixo do rebordo interior da mesa */
+.table-led-strip {
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  border: 2.5px solid var(--led-bright);
+  box-shadow:
+    0 0 8px var(--led-core),
+    0 0 20px var(--led-core),
+    inset 0 0 12px var(--led-core),
+    inset 0 0 26px var(--led-glow-soft);
+  pointer-events: none;
+  z-index: 2;
+  transition: border-color 0.65s ease, box-shadow 0.65s ease;
+  animation: ledBreathe 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes ledBreathe {
+  0% { opacity: 0.82; }
+  100% { opacity: 1; }
+}
+
+/* Linha de apostas e marca d'água acompanham a inclinação 3D do feltro */
+.table-3d-body .table-betting-line {
+  inset: 22px 30px;
+  border-radius: 185px;
+  border: 1.5px solid rgba(253, 224, 71, 0.25);
+  z-index: 1;
+}
+
+.table-3d-body .table-watermark {
+  bottom: 14%;
+  font-size: 0.88rem;
+  letter-spacing: 5px;
+  color: rgba(255, 255, 255, 0.08);
+  z-index: 1;
+}
+
+/* Ajuste de lugares à perspetiva trapezoidal (topo mais estreito, base mais larga) */
+.dealer-seat {
+  top: -8%;
+  transform: translate(-50%, -38%);
+}
+
+.seat-0 { left: 50%; top: 96%; }
+.seat-1 { left: 2%;  top: 72%; }
+.seat-2 { left: 23%; top: -2%; }
+.seat-3 { left: 77%; top: -2%; }
+.seat-4 { left: 98%; top: 72%; }
+
+.poker-table.six-players .seat-0 { left: 31%; top: 96%; }
+.poker-table.six-players .seat-1 { left: -3%; top: 52%; }
+.poker-table.six-players .seat-2 { left: 23%; top: -2%; }
+.poker-table.six-players .seat-3 { left: 77%; top: -2%; }
+.poker-table.six-players .seat-4 { left: 103%; top: 52%; }
+.poker-table.six-players .seat-5 { left: 69%; top: 96%; }
+
+/* Mobile Horizontal (Landscape) — Mesa compacta 3D com folga para HUD e Dealer */
+@media (orientation: landscape) and (max-height: 540px) {
+  .table-area {
+    padding:
+      26px
+      max(72px, env(safe-area-inset-right))
+      76px
+      max(72px, env(safe-area-inset-left));
+  }
+
+  body.is-fullscreen .table-area {
+    padding:
+      30px
+      max(78px, env(safe-area-inset-right))
+      80px
+      max(78px, env(safe-area-inset-left));
+  }
+
+  .poker-table {
+    width: min(515px, 59vw);
+    height: min(182px, 46dvh);
+  }
+
+  body.is-fullscreen .poker-table {
+    width: min(550px, 61vw);
+    height: min(195px, 49dvh);
+  }
+
+  .table-3d-stage {
+    perspective: 540px;
+    perspective-origin: 50% 30%;
+  }
+
+  .table-3d-body {
+    inset: -10% -2% 4% -2%;
+    border-radius: 130px;
+    border-width: 11px;
+    transform: rotateX(29deg);
+    box-shadow:
+      0 3px 0 #3d2415,
+      0 6px 0 #2b180e,
+      0 9px 0 #1b0f08,
+      0 16px 34px rgba(0, 0, 0, 0.88),
+      0 10px 26px var(--led-glow-soft),
+      inset 0 0 42px rgba(0, 0, 0, 0.72),
+      inset 0 0 18px var(--led-glow-soft);
+  }
+
+  .table-led-strip {
+    inset: 1.5px;
+    border-width: 2px;
+  }
+
+  .table-3d-body .table-betting-line {
+    inset: 11px 16px;
+    border-radius: 105px;
+  }
+
+  .table-3d-body .table-watermark {
+    bottom: 12%;
+    font-size: 0.56rem;
+    letter-spacing: 3px;
+  }
+
+  .dealer-seat {
+    top: -6%;
+    transform: translate(-50%, -34%);
+  }
+
+  .table-center {
+    margin-top: 0.55rem;
+  }
+
+  .seat-0 { left: 50%; top: 94%; }
+  .seat-1 { left: 0%;  top: 70%; }
+  .seat-2 { left: 23%; top: -1%; }
+  .seat-3 { left: 77%; top: -1%; }
+  .seat-4 { left: 100%; top: 70%; }
+
+  .poker-table.six-players .seat-0 { left: 31%; top: 94%; }
+  .poker-table.six-players .seat-1 { left: -4%; top: 52%; }
+  .poker-table.six-players .seat-2 { left: 23%; top: -1%; }
+  .poker-table.six-players .seat-3 { left: 77%; top: -1%; }
+  .poker-table.six-players .seat-4 { left: 104%; top: 52%; }
+  .poker-table.six-players .seat-5 { left: 69%; top: 94%; }
+}
+
+@media (orientation: landscape) and (max-height: 365px) {
+  body.is-fullscreen .poker-table {
+    height: 45dvh;
+  }
+}
+
+/* Mobile Vertical (Portrait) */
+@media (max-width: 780px) and (orientation: portrait) {
+  .poker-table {
+    width: 78vw;
+    height: 36dvh;
+  }
+  .table-3d-body {
+    border-width: 10px;
+    transform: rotateX(22deg);
+    box-shadow:
+      0 3px 0 #3d2415,
+      0 6px 0 #2b180e,
+      0 14px 30px rgba(0, 0, 0, 0.85),
+      0 8px 22px var(--led-glow-soft),
+      inset 0 0 36px rgba(0, 0, 0, 0.72),
+      inset 0 0 16px var(--led-glow-soft);
+  }
 }
