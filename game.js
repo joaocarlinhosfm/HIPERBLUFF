@@ -221,6 +221,38 @@ const NEXT_HAND_DELAY_MS = 6000;
 const AUTO_START_DELAY_MS = 10000;
 const RUNOUT_STEP_MS = 1300;
 
+const LED_THEMES = [
+  { name: "Gelo",       core: "#38bdf8", bright: "#bae6fd", soft: "rgba(56, 189, 248, 0.45)" },
+  { name: "Ouro Vegas", core: "#f59e0b", bright: "#fef08a", soft: "rgba(245, 158, 11, 0.46)" },
+  { name: "Roxo Neon",  core: "#a855f7", bright: "#e9d5ff", soft: "rgba(168, 85, 247, 0.48)" },
+  { name: "Rubi",       core: "#f43f5e", bright: "#fecdd3", soft: "rgba(244, 63, 94, 0.46)" },
+  { name: "Esmeralda",  core: "#10b981", bright: "#a7f3d0", soft: "rgba(16, 185, 129, 0.46)" },
+  { name: "Magenta",    core: "#ec4899", bright: "#fbcfe8", soft: "rgba(236, 72, 153, 0.46)" },
+  { name: "Âmbar",      core: "#f97316", bright: "#fed7aa", soft: "rgba(249, 115, 22, 0.46)" }
+];
+
+let lastLedIndex = Number(sessionStorage.getItem("hiperbluff_led") ?? -1);
+
+function pickNextLedIndex() {
+  let idx;
+  do {
+    idx = secureRandomInt(LED_THEMES.length);
+  } while (idx === lastLedIndex && LED_THEMES.length > 1);
+  lastLedIndex = idx;
+  try { sessionStorage.setItem("hiperbluff_led", String(idx)); } catch (_) {}
+  return idx;
+}
+
+function applyTableLedTheme(index) {
+  const safeIdx = ((Number(index) || 0) % LED_THEMES.length + LED_THEMES.length) % LED_THEMES.length;
+  const theme = LED_THEMES[safeIdx];
+  const root = document.documentElement;
+  root.style.setProperty("--led-core", theme.core);
+  root.style.setProperty("--led-bright", theme.bright);
+  root.style.setProperty("--led-glow-soft", theme.soft);
+  lastLedIndex = safeIdx;
+  try { sessionStorage.setItem("hiperbluff_led", String(safeIdx)); } catch (_) {}
+}
 const $ = (id) => document.getElementById(id);
 const on = (id, event, handler) => {
   const el = $(id);
