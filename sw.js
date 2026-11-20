@@ -1,15 +1,20 @@
-const CACHE_NAME = "hiperbluff-v6.1";
+const CACHE_NAME = "hiperbluff-v6.2";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./game.js",
-  "./manifest.json"
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    // allSettled-like: um ficheiro em falta (ex.: ícone) não pode impedir a instalação do service worker
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(ASSETS.map((url) => cache.add(url).catch(() => {})))
+    )
   );
   self.skipWaiting();
 });

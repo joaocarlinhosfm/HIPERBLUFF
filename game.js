@@ -1,8 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
 /* ============================================================================
-   1. CONFIGURAÇÃO FIREBASE
+   1. CONFIGURAÇÃO FIREBASE (CARREGADO DINAMICAMENTE — O JOGO ARRANCA MESMO OFFLINE)
    ============================================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk",
@@ -11,17 +8,48 @@ const firebaseConfig = {
   projectId: "hiperbluff"
 };
 
+const FIREBASE_VERSION = "10.12.2";
+const FIREBASE_OFFLINE_MSG =
+  "Sem ligação ao Firebase. Verifica a internet ou usa o modo teste (offline).";
+
 let db = null;
+let initializeApp, getDatabase, ref, set, get, onValue, update, runTransaction;
+
+// Diferença entre o relógio local e o relógio do servidor Firebase (corrige telemóveis desfasados)
+let serverOffset = 0;
+const nowMs = () => Date.now() + serverOffset;
+
 const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.databaseURL);
 
-if (isFirebaseConfigured) {
+async function loadFirebase() {
+  if (!isFirebaseConfigured) return false;
   try {
+    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+    const [appMod, dbMod] = await withTimeout(
+      Promise.all([
+        import(`${base}/firebase-app.js`),
+        import(`${base}/firebase-database.js`)
+      ]),
+      8000
+    );
+    ({ initializeApp } = appMod);
+    ({ getDatabase, ref, set, get, onValue, update, runTransaction } = dbMod);
+
     const app = initializeApp(firebaseConfig);
     db = getDatabase(app);
+    onValue(ref(db, ".info/serverTimeOffset"), (snap) => {
+      serverOffset = Number(snap.val()) || 0;
+    });
+    return true;
   } catch (err) {
-    console.error("Erro ao inicializar Firebase:", err);
+    console.error("Firebase indisponível (offline?):", err);
+    db = null;
+    return false;
   }
 }
+
+// A interface fica logo ativa; as ações online esperam por esta promessa.
+const firebaseReady = loadFirebase();
 
 /* ============================================================================
    2. MOTOR DE ÁUDIO SINTÉTICO (WEB AUDIO API — ZERO MP3 EXTERNOS)
@@ -185,6 +213,8 @@ const MAX_PLAYERS = 6;
 const STARTING_CHIPS = 1000;
 const SMALL_BLIND = 10;
 const BIG_BLIND = 20;
+const MAX_NAME_LEN = 14;
+const MAX_STATUS_LEN = 30;
 
 const TURN_DURATION_MS = 20000;
 const NEXT_HAND_DELAY_MS = 6000;
@@ -196,6 +226,17 @@ const on = (id, event, handler) => {
   const el = $(id);
   if (el) el.addEventListener(event, handler);
 };
+
+/* Escapa HTML — OBRIGATÓRIO em tudo o que vem do Firebase e vai para innerHTML (anti-XSS) */
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function cleanText(value, max) {
+  return String(value ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, max);
+}
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -387,7 +428,7 @@ function normalizeRoomState(raw) {
     message: raw.message || "",
     players: playersArr.filter(Boolean).map(p => ({
       id: p.id,
-      name: p.name || "Jogador",
+      name: cleanText(p.name, MAX_NAME_LEN) || "Jogador",
       chips: Number(p.chips) || 0,
       bet: Number(p.bet) || 0,
       totalBet: Number(p.totalBet) || 0,
@@ -396,7 +437,7 @@ function normalizeRoomState(raw) {
       allIn: Boolean(p.allIn),
       acted: Boolean(p.acted),
       isBot: Boolean(p.isBot),
-      status: p.status || ""
+      status: cleanText(p.status, MAX_STATUS_LEN)
     }))
   };
 }
@@ -404,8 +445,43 @@ function normalizeRoomState(raw) {
 /* ============================================================================
    6. ESTADO LOCAL, SINCRONIZAÇÃO E MOTOR DE TIMERS
    ============================================================================ */
+
+/* ID do jogador PERSISTENTE: se a app for fechada/recarregada, voltas ao mesmo lugar.
+   Para testar 2 jogadores no mesmo browser, abre o 2.º separador com  ?p=2  no URL. */
+const PLAYER_SLOT = (() => {
+  try { return (new URLSearchParams(location.search).get("p") || "").replace(/[^a-z0-9]/gi, ""); }
+  catch (_) { return ""; }
+})();
+
+function randomPlayerId() {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "p_";
+  for (let i = 0; i < 8; i++) id += alphabet[secureRandomInt(alphabet.length)];
+  return id;
+}
+
+function loadOrCreatePlayerId() {
+  const key = "hb_id" + PLAYER_SLOT;
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved && /^p_[a-z0-9]{4,}$/.test(saved)) return saved;
+    const fresh = randomPlayerId();
+    localStorage.setItem(key, fresh);
+    return fresh;
+  } catch (_) {
+    return randomPlayerId();
+  }
+}
+
+function saveLastRoom(code) {
+  try { localStorage.setItem("hb_last_room", code); } catch (_) {}
+}
+function loadLastRoom() {
+  try { return localStorage.getItem("hb_last_room") || ""; } catch (_) { return ""; }
+}
+
 let localMode = true;
-let myId = "p_" + Math.random().toString(36).slice(2, 8);
+let myId = loadOrCreatePlayerId();
 let myName = "Jogador";
 let currentRoomCode = null;
 let roomState = null;
@@ -455,7 +531,7 @@ function createInitialRoom(hostId, hostName) {
 }
 
 function setSoundEvent(state, type) {
-  state.lastEvent = { type, ts: Date.now() + Math.random() };
+  state.lastEvent = { type, ts: nowMs() + Math.random() };
 }
 
 async function syncState(newState) {
@@ -490,7 +566,7 @@ function stopTimerLoop() {
 
 function tickTimers() {
   if (!roomState) return;
-  const now = Date.now();
+  const now = nowMs();
   const isHost = roomState.hostId === myId;
 
   // 1. Run-out progressivo de All-In
@@ -649,7 +725,7 @@ function startNewHand() {
     s.isRunout = true;
     s.turnIndex = -1;
     s.turnDeadline = 0;
-    s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+    s.runoutDeadline = nowMs() + RUNOUT_STEP_MS;
     s.message = "ALL-IN nas Blinds! A revelar cartas...";
     setSoundEvent(s, "shuffle");
     syncState(s);
@@ -657,7 +733,7 @@ function startNewHand() {
   }
 
   s.turnIndex = firstToAct;
-  s.turnDeadline = Date.now() + TURN_DURATION_MS;
+  s.turnDeadline = nowMs() + TURN_DURATION_MS;
   s.message = `Cartas dadas! Vez de ${s.players[s.turnIndex].name}.`;
   setSoundEvent(s, "shuffle");
   syncState(s);
@@ -697,7 +773,7 @@ async function performRebuy() {
       s.players[myIdx].folded = false;
       const alive = s.players.filter(pl => pl.chips > 0).length;
       if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
-        s.nextHandDeadline = Date.now() + 3000;
+        s.nextHandDeadline = nowMs() + 3000;
         s.message = `${me.name} fez Rebuy (+${STARTING_CHIPS}€)! Nova mão a começar...`;
       }
     }
@@ -711,12 +787,16 @@ async function performRebuy() {
       updates[`players/${myIdx}/folded`] = false;
       const aliveAfter = roomState.players.filter((pl, idx) => (idx === myIdx ? true : pl.chips > 0)).length;
       if (roomState.phase === "SHOWDOWN" && aliveAfter >= 2 && roomState.nextHandDeadline === 0) {
-        updates["nextHandDeadline"] = Date.now() + 3000;
+        updates["nextHandDeadline"] = nowMs() + 3000;
         updates["message"] = `${me.name} fez Rebuy (+${STARTING_CHIPS}€)! Nova mão a começar...`;
       }
     }
     SoundEngine.chip();
-    await update(ref(db, `rooms/${currentRoomCode}`), updates);
+    try {
+      await withTimeout(update(ref(db, `rooms/${currentRoomCode}`), updates));
+    } catch (err) {
+      console.error("Erro ao fazer Rebuy:", err);
+    }
   }
 }
 
@@ -788,6 +868,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
       soundType = toCall === 0 ? "check" : "chip";
     }
   } else if (action === "raise") {
+    const prevCurrentBet = s.currentBet;
     const target = Math.max(Number(raiseTo) || 0, s.currentBet + s.minRaise);
     const needed = Math.max(0, Math.min(p.chips, target - p.bet));
     const newBet = p.bet + needed;
@@ -800,9 +881,15 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     p.bet = newBet;
     p.totalBet += needed;
     s.pot += needed;
-    p.status = p.chips === 0 ? "ALL-IN" : `RAISE ${newBet}€`;
-    soundType = p.chips === 0 ? "allin" : "chip";
-    if (p.chips === 0) p.allIn = true;
+    if (p.chips === 0) {
+      p.allIn = true;
+      p.status = "ALL-IN";
+      soundType = "allin";
+    } else {
+      // Se não ultrapassou a aposta atual, na prática foi um Call (evita mostrar "RAISE" falso)
+      p.status = newBet > prevCurrentBet ? `RAISE ${newBet}€` : `CALL ${needed}€`;
+      soundType = "chip";
+    }
   } else if (action === "allin") {
     const push = p.chips;
     p.bet += push;
@@ -824,6 +911,8 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
   const remaining = s.players.filter(pl => !pl.folded);
   if (remaining.length === 1) {
     remaining[0].chips += s.pot;
+    // Limpa as apostas à mesa (já estão contabilizadas no pote entregue ao vencedor)
+    s.players.forEach(pl => { pl.bet = 0; });
     s.winnerIds = [remaining[0].id];
     s.winningHandName = `${remaining[0].name} VENCEU`;
     s.winningCards = [];
@@ -834,7 +923,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
     s.isRunout = false;
     s.runoutDeadline = 0;
     const stillAlive = s.players.filter(pl => pl.chips > 0).length >= 2;
-    s.nextHandDeadline = stillAlive ? Date.now() + NEXT_HAND_DELAY_MS : 0;
+    s.nextHandDeadline = stillAlive ? nowMs() + NEXT_HAND_DELAY_MS : 0;
     setSoundEvent(s, "win");
     syncState(s);
     return;
@@ -862,7 +951,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
       s.turnIndex = -1;
       s.turnDeadline = 0;
       s.isRunout = true;
-      s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+      s.runoutDeadline = nowMs() + RUNOUT_STEP_MS;
       s.message = "ALL-IN! A revelar cartas...";
       setSoundEvent(s, soundType);
       syncState(s);
@@ -878,7 +967,7 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
       return;
     }
     s.turnIndex = nextIdx;
-    s.turnDeadline = Date.now() + TURN_DURATION_MS;
+    s.turnDeadline = nowMs() + TURN_DURATION_MS;
     s.message = `Vez de ${s.players[s.turnIndex].name}.`;
     setSoundEvent(s, soundType);
     syncState(s);
@@ -919,7 +1008,7 @@ function advancePhase(s) {
     s.isRunout = true;
     s.turnIndex = -1;
     s.turnDeadline = 0;
-    s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+    s.runoutDeadline = nowMs() + RUNOUT_STEP_MS;
     s.message = `ALL-IN! ${s.phase} na mesa...`;
     setSoundEvent(s, "card");
     syncState(s);
@@ -931,7 +1020,7 @@ function advancePhase(s) {
     s.isRunout = true;
     s.turnIndex = -1;
     s.turnDeadline = 0;
-    s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+    s.runoutDeadline = nowMs() + RUNOUT_STEP_MS;
     setSoundEvent(s, "card");
     syncState(s);
     return;
@@ -940,7 +1029,7 @@ function advancePhase(s) {
   s.isRunout = false;
   s.runoutDeadline = 0;
   s.turnIndex = nextIdx;
-  s.turnDeadline = Date.now() + TURN_DURATION_MS;
+  s.turnDeadline = nowMs() + TURN_DURATION_MS;
   s.message = `${s.phase} na mesa — Vez de ${s.players[s.turnIndex].name}.`;
   setSoundEvent(s, "card");
   syncState(s);
@@ -1014,7 +1103,7 @@ function resolveShowdown(s) {
   s.message = `🏆 ${potSummaries.join(" • ")}`;
 
   const stillAlive = s.players.filter(pl => pl.chips > 0).length >= 2;
-  s.nextHandDeadline = stillAlive ? Date.now() + NEXT_HAND_DELAY_MS : 0;
+  s.nextHandDeadline = stillAlive ? nowMs() + NEXT_HAND_DELAY_MS : 0;
   setSoundEvent(s, "win");
   syncState(s);
 }
@@ -1047,7 +1136,7 @@ function maybeTriggerBotTurn() {
 }
 
 /* ============================================================================
-   9. RENDERIZAÇÃO DA INTERFACE, ASSETS HD E HIGHLIGHT DE VITÓRIA
+   9. RENDERIZAÇÃO DA INTERFACE (ESQUEMA ZYNGA + SHOWDOWN HIGHLIGHT)
    ============================================================================ */
 function renderPotChipsHTML(amount) {
   if (!amount || amount <= 0) return "";
@@ -1083,16 +1172,18 @@ function renderCardHTML(card, hidden = false, small = false, highlightClass = ""
     `;
   }
   const isRed = card.suit === "♥" || card.suit === "♦" ? "red" : "";
+  const label = esc(card.label);
+  const suit = esc(card.suit);
   return `
     <div class="card ${isRed} ${sizeClass} ${highlightClass}">
       <div class="card-corner top">
-        <span class="card-rank">${card.label}</span>
-        <span class="card-suit-mini">${card.suit}</span>
+        <span class="card-rank">${label}</span>
+        <span class="card-suit-mini">${suit}</span>
       </div>
-      <div class="card-center">${card.suit}</div>
+      <div class="card-center">${suit}</div>
       <div class="card-corner bottom">
-        <span class="card-rank">${card.label}</span>
-        <span class="card-suit-mini">${card.suit}</span>
+        <span class="card-rank">${label}</span>
+        <span class="card-suit-mini">${suit}</span>
       </div>
     </div>
   `;
@@ -1114,6 +1205,13 @@ function renderGame() {
   const winnerIdsSet = new Set(roomState.winnerIds || []);
   const hasCardHighlights = isShowdown && winCardsSet.size > 0;
 
+  // Alterna entre esquema Zynga de 5 lugares (Tu no centro) e 6 lugares quando entra o 6.º jogador
+  const tableEl = document.querySelector(".poker-table");
+  const visibleSeatsCount = players.length > 5 ? 6 : 5;
+  if (tableEl) {
+    tableEl.classList.toggle("six-players", visibleSeatsCount === 6);
+  }
+
   if ($("display-room-code")) $("display-room-code").textContent = currentRoomCode || "DEMO";
   if ($("display-phase")) $("display-phase").textContent = isWaiting ? "A AGUARDAR" : roomState.phase;
   if ($("pot-amount")) $("pot-amount").textContent = roomState.pot;
@@ -1129,12 +1227,14 @@ function renderGame() {
     }
   }
 
+  // Só mostra Side Pots quando há pelo menos um jogador ativo em All-In
   const sidePotsEl = $("side-pots-display");
   if (sidePotsEl) {
-    const sidePots = buildSidePots(players);
-    if (sidePots.length > 1 && !isWaiting) {
+    const hasActiveAllIn = players.some(p => !p.folded && p.allIn);
+    const sidePots = hasActiveAllIn ? buildSidePots(players) : [];
+    if (hasActiveAllIn && sidePots.length > 1 && !isWaiting) {
       sidePotsEl.innerHTML = sidePots
-        .map((sp, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${sp.amount}€</span>`)
+        .map((sp, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${Number(sp.amount) || 0}€</span>`)
         .join("");
       sidePotsEl.classList.remove("hidden");
     } else {
@@ -1182,8 +1282,14 @@ function renderGame() {
     const el = document.querySelector(`.seat-${seatVisual}`);
     if (!el) continue;
 
-    const pIdx = (seatVisual + offset) % MAX_PLAYERS;
-    const p = players[pIdx];
+    if (seatVisual >= visibleSeatsCount) {
+      el.className = `seat seat-${seatVisual} empty`;
+      el.innerHTML = "";
+      continue;
+    }
+
+    const pIdx = seatVisual < players.length ? (seatVisual + offset) % players.length : -1;
+    const p = pIdx >= 0 ? players[pIdx] : null;
 
     if (!p) {
       el.className = `seat seat-${seatVisual} empty`;
@@ -1203,41 +1309,82 @@ function renderGame() {
     const inHand = !p.folded && p.hand && p.hand.length === 2;
     const revealOnRunout = roomState.isRunout && !p.folded;
     const showCards = isMe || revealOnRunout || (isShowdown && !p.folded && hasCardHighlights);
-    const largeCards = isMe || isWinner || revealOnRunout;
 
-    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
+    // Valores vindos do Firebase: SEMPRE escapados antes de ir para innerHTML
+    const safeName = esc(p.name);
+    const safeStatus = esc(p.status);
 
-    const cardsHTML = inHand
-      ? `<div class="seat-cards ${largeCards ? "my-cards" : "opp-cards"}">${p.hand.map(c => {
-          let hl = "";
-          if (hasCardHighlights && showCards) {
-            hl = isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
-          }
-          return renderCardHTML(c, !showCards, !largeCards, hl);
-        }).join("")}</div>`
+    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${inHand ? "has-cards" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
+
+    const betPillHTML = p.bet > 0
+      ? `<div class="bet-pill"><span class="mini-chip"></span>${Number(p.bet) || 0} €</div>`
       : "";
 
-    const betHTML = p.bet > 0
-      ? `<div class="seat-bet-zone"><div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div></div>`
-      : "";
+    if (isMe) {
+      // HERÓI (ESTILO ZYNGA): cartas à frente da base do círculo + aposta acima no feltro
+      const heroCardsHTML = inHand
+        ? `<div class="hero-cards">${p.hand.map(c => {
+            let hl = "";
+            if (hasCardHighlights) {
+              hl = isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
+            }
+            return renderCardHTML(c, false, false, hl);
+          }).join("")}</div>`
+        : "";
 
-    el.innerHTML = `
-      ${betHTML}
-      <div class="seat-avatar-stack">
-        ${cardsHTML}
-        <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
-          ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
-          ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
-          <div class="seat-circle">
-            <div class="seat-name" title="${p.name}">${p.name}</div>
-            ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
+      const heroBetHTML = betPillHTML
+        ? `<div class="hero-bet-zone">${betPillHTML}</div>`
+        : "";
+
+      el.innerHTML = `
+        <div class="seat-avatar-stack">
+          ${heroBetHTML}
+          <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
+            ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+            ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+            <div class="seat-circle">
+              <div class="seat-name" title="${safeName}">${safeName}</div>
+              <div class="seat-you-tag">TU</div>
+            </div>
+            ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
           </div>
-          ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
+          ${heroCardsHTML}
         </div>
-      </div>
-      <div class="seat-chips">${p.chips} €</div>
-      ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}
-    `;
+        <div class="seat-chips">${Number(p.chips) || 0} €</div>
+        ${safeStatus ? `<div class="seat-status">${safeStatus}</div>` : ""}
+      `;
+    } else {
+      // ADVERSÁRIOS (ESTILO ZYNGA): cartas + ficha de aposta lado a lado dentro do feltro
+      const oppCardsHTML = inHand
+        ? `<div class="opp-cards ${showCards ? "revealed" : ""}">${p.hand.map(c => {
+            let hl = "";
+            if (hasCardHighlights && showCards) {
+              hl = isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim";
+            }
+            return renderCardHTML(c, !showCards, !showCards, hl);
+          }).join("")}</div>`
+        : "";
+
+      const feltZoneHTML = (oppCardsHTML || betPillHTML)
+        ? `<div class="seat-felt-zone">${oppCardsHTML}${betPillHTML}</div>`
+        : "";
+
+      el.innerHTML = `
+        ${feltZoneHTML}
+        <div class="seat-avatar-stack">
+          <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>
+            ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+            ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+            <div class="seat-circle">
+              <div class="seat-name" title="${safeName}">${safeName}</div>
+            </div>
+            ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}
+          </div>
+        </div>
+        <div class="seat-chips">${Number(p.chips) || 0} €</div>
+        ${safeStatus ? `<div class="seat-status">${safeStatus}</div>` : ""}
+      `;
+    }
   }
 
   const me = players[myIndex];
@@ -1345,6 +1492,13 @@ function setQuickRaise(mode) {
   if ($("raise-value")) $("raise-value").textContent = target;
 }
 
+// Repõe o último código de sala usado (útil se a app foi fechada pelo Android)
+(function prefillLastRoom() {
+  const input = $("room-code");
+  const last = loadLastRoom();
+  if (input && last && !input.value) input.value = last;
+})();
+
 on("btn-mute", "click", () => {
   const muted = SoundEngine.toggleMute();
   const btn = $("btn-mute");
@@ -1357,10 +1511,6 @@ on("btn-mute", "click", () => {
 on("btn-create-room", "click", async () => {
   SoundEngine.init();
   showError("");
-  if (!isFirebaseConfigured || !db) {
-    showError("Configura primeiro as tuas chaves do Firebase no topo de game.js (ou usa o modo teste).");
-    return;
-  }
 
   const btn = $("btn-create-room");
   const originalText = btn.textContent;
@@ -1368,12 +1518,19 @@ on("btn-create-room", "click", async () => {
   btn.textContent = "A criar sala...";
 
   try {
-    myName = ($("player-name")?.value || "").trim() || "Jogador";
+    await firebaseReady;
+    if (!isFirebaseConfigured || !db) {
+      showError(FIREBASE_OFFLINE_MSG);
+      return;
+    }
+
+    myName = cleanText($("player-name")?.value, MAX_NAME_LEN) || "Jogador";
     localMode = false;
     currentRoomCode = generateRoomCode();
     const initial = createInitialRoom(myId, myName);
 
     await withTimeout(set(ref(db, `rooms/${currentRoomCode}`), initial));
+    saveLastRoom(currentRoomCode);
     roomState = initial;
     openGameScreen();
     renderGame();
@@ -1395,14 +1552,9 @@ on("btn-create-room", "click", async () => {
 on("btn-join-room", "click", async () => {
   SoundEngine.init();
   showError("");
-  if (!isFirebaseConfigured || !db) {
-    showError("Configura primeiro o Firebase no topo de game.js.");
-    return;
-  }
 
   const code = ($("room-code")?.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-  myName = ($("player-name")?.value || "").trim() || "Jogador";
-  if (!code) return showError("Introduz o código da sala.");
+  myName = cleanText($("player-name")?.value, MAX_NAME_LEN) || "Jogador";
 
   const btn = $("btn-join-room");
   const originalText = btn.textContent;
@@ -1410,6 +1562,16 @@ on("btn-join-room", "click", async () => {
   btn.textContent = "A entrar...";
 
   try {
+    await firebaseReady;
+    if (!isFirebaseConfigured || !db) {
+      showError(FIREBASE_OFFLINE_MSG);
+      return;
+    }
+    if (!code) {
+      showError("Introduz o código da sala.");
+      return;
+    }
+
     const snap = await withTimeout(get(ref(db, `rooms/${code}`)));
     if (!snap.exists()) {
       showError(`Sala "${code}" não encontrada.`);
@@ -1417,22 +1579,43 @@ on("btn-join-room", "click", async () => {
     }
 
     const data = normalizeRoomState(snap.val());
-    const players = data.players;
-    if (players.length >= MAX_PLAYERS) {
+    const isWaitingPhase = data.phase === "WAITING";
+    const newPlayer = {
+      id: myId, name: myName, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
+      hand: [], folded: !isWaitingPhase, allIn: false, acted: false, isBot: false,
+      status: isWaitingPhase ? "PRONTO" : "A AGUARDAR MÃO"
+    };
+
+    // TRANSAÇÃO ATÓMICA: dois jogadores a entrar em simultâneo já não se sobrepõem.
+    // Se o teu id já estiver na sala (reconexão), reutiliza o teu lugar.
+    let outcome = "";
+    const tx = await withTimeout(
+      runTransaction(ref(db, `rooms/${code}/players`), (current) => {
+        const list = Array.isArray(current)
+          ? current.filter(Boolean)
+          : Object.values(current || {});
+        if (list.some(pl => pl && pl.id === myId)) {
+          outcome = "rejoin";
+          return list;
+        }
+        if (list.length >= MAX_PLAYERS) {
+          outcome = "full";
+          return; // aborta a transação
+        }
+        outcome = "joined";
+        return [...list, newPlayer];
+      })
+    );
+
+    if (!tx.committed || outcome === "full") {
       showError("A mesa já está cheia (6/6).");
       return;
     }
 
     localMode = false;
     currentRoomCode = code;
-    players.push({
-      id: myId, name: myName, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
-      hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false,
-      status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
-    });
-
-    await withTimeout(update(ref(db, `rooms/${code}`), { players }));
-    roomState = { ...data, players };
+    saveLastRoom(code);
+    roomState = normalizeRoomState({ ...snap.val(), players: tx.snapshot.val() });
     subscribeToRoom(code);
     openGameScreen();
     renderGame();
@@ -1470,7 +1653,7 @@ function subscribeToRoom(code) {
         players.length >= 2 &&
         (!roomState.nextHandDeadline || roomState.nextHandDeadline === 0)
       ) {
-        const deadline = Date.now() + AUTO_START_DELAY_MS;
+        const deadline = nowMs() + AUTO_START_DELAY_MS;
         update(ref(db, `rooms/${code}`), {
           nextHandDeadline: deadline,
           message: `Jogadores na mesa (${players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`
@@ -1485,11 +1668,11 @@ function subscribeToRoom(code) {
 on("btn-demo-mode", "click", () => {
   SoundEngine.init();
   showError("");
-  myName = ($("player-name")?.value || "").trim() || "Tu";
+  myName = cleanText($("player-name")?.value, MAX_NAME_LEN) || "Tu";
   localMode = true;
   currentRoomCode = "OFFLINE";
   const demo = createInitialRoom(myId, myName);
-  const botNames = ["Tiago", "Marta", "Rui", "Inês", "Carlos"];
+  const botNames = ["Tiago", "Marta", "Rui", "Inês"];
   botNames.forEach((name, i) => {
     demo.players.push({
       id: `bot_${i}`, name, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
@@ -1528,7 +1711,10 @@ on("btn-leave", "click", async () => {
     }
   }
   stopTimerLoop();
-  if (unsubscribeRoom) unsubscribeRoom();
+  if (unsubscribeRoom) {
+    unsubscribeRoom();
+    unsubscribeRoom = null;
+  }
   roomState = null;
   wasMyTurn = false;
   if ($("game-screen")) $("game-screen").classList.remove("active");
