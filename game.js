@@ -8,8 +8,8 @@ import {
   buildNewHandState, advancePhaseOnState, applyActionToState
 } from "./poker.js";
 import {
-  initUserSystem, restoreSession, registerUser, loginUser,
-  logoutUser, getCurrentUser, applyBalanceDelta, formatEuro
+  INITIAL_BALANCE, initUserSystem, restoreSession, registerUser, loginUser,
+  logoutUser, getCurrentUser, applyBalanceDelta, recordActionStats, formatEuro
 } from "./user.js";
 
 /* ============================================================================
@@ -25,15 +25,21 @@ const firebaseConfig = {
 let db = null;
 const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.databaseURL);
 if (isFirebaseConfigured) {
-  try {
-    db = getDatabase(initializeApp(firebaseConfig));
-  } catch (err) {
-    console.error("Erro ao inicializar Firebase:", err);
-  }
+  try { db = getDatabase(initializeApp(firebaseConfig)); } catch (err) { console.error("Erro Firebase:", err); }
 }
 
 const $ = (id) => document.getElementById(id);
 const on = (id, event, handler) => { const el = $(id); if (el) el.addEventListener(event, handler); };
+
+function showScreen(screenId) {
+  ["auth-screen", "hub-screen", "profile-screen", "game-screen"].forEach(id => {
+    $(id)?.classList.toggle("active", id === screenId);
+  });
+}
+
+function getActiveScreenId() {
+  return ["auth-screen", "hub-screen", "profile-screen", "game-screen"].find(id => $(id)?.classList.contains("active")) || "auth-screen";
+}
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -92,13 +98,9 @@ async function syncState(newState) {
     maybeTriggerBotTurn();
   } else if (db && currentRoomCode) {
     isSyncingAction = true;
-    try {
-      await set(ref(db, `rooms/${currentRoomCode}`), clean);
-    } catch (err) {
-      console.error("Erro ao sincronizar estado:", err);
-    } finally {
-      isSyncingAction = false;
-    }
+    try { await set(ref(db, `rooms/${currentRoomCode}`), clean); }
+    catch (err) { console.error("Erro ao sincronizar:", err); }
+    finally { isSyncingAction = false; }
   }
 }
 
@@ -107,8 +109,29 @@ function startNewHand() {
   syncState(buildNewHandState(roomState));
 }
 
+function trackMyActionStat(action, raiseTo) {
+  if (!roomState || roomState.isRunout || roomState.turnIndex < 0) return;
+  const p = roomState.players[roomState.turnIndex];
+  if (!p || p.id !== myId) return;
+
+  if (action === "fold") {
+    recordActionStats({ fold: 1 });
+  } else if (action === "allin") {
+    recordActionStats({ allIn: 1 });
+  } else if (action === "raise") {
+    const target = Math.max(Number(raiseTo) || 0, roomState.currentBet + roomState.minRaise);
+    const needed = Math.max(0, Math.min(p.chips, target - p.bet));
+    recordActionStats({ raise: 1, allIn: needed >= p.chips ? 1 : 0 });
+  } else if (action === "check-call") {
+    const toCall = Math.max(0, Math.min(p.chips, roomState.currentBet - p.bet));
+    if (toCall === 0) recordActionStats({ check: 1 });
+    else recordActionStats({ call: 1, allIn: toCall >= p.chips ? 1 : 0 });
+  }
+}
+
 function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
   if (isSyncingAction && !isTimeout) return;
+  if (playerId === myId) trackMyActionStat(action, raiseTo);
   const next = applyActionToState(roomState, playerId, action, raiseTo, isTimeout);
   if (next) syncState(next);
 }
@@ -120,15 +143,8 @@ function startNewMatchReset() {
   const s = normalizeRoomState(structuredClone(roomState));
   s.players.forEach(p => {
     const stack = p.id === myId ? myStack : STARTING_CHIPS;
-    p.chips = stack;
-    p.handStartChips = stack;
-    p.bet = 0;
-    p.totalBet = 0;
-    p.folded = false;
-    p.allIn = false;
-    p.acted = false;
-    p.participated = false;
-    p.status = "PRONTO";
+    p.chips = stack; p.handStartChips = stack; p.bet = 0; p.totalBet = 0;
+    p.folded = false; p.allIn = false; p.acted = false; p.participated = false; p.status = "PRONTO";
   });
   roomState = s;
   startNewHand();
@@ -224,16 +240,12 @@ function tickTimers() {
     const pct = Math.min(100, (remainingMs / TURN_DURATION_MS) * 100);
     const secs = Math.ceil(remainingMs / 1000);
 
-    const ringEl = $("active-timer-ring");
-    const textEl = $("active-timer-text");
+    const ringEl = $("active-timer-ring"), textEl = $("active-timer-text");
     if (ringEl) {
       const color = secs <= 5 ? "#e11d48" : secs <= 10 ? "#f5b942" : "#22c55e";
       ringEl.style.background = `conic-gradient(${color} ${pct}%, rgba(255, 255, 255, 0.12) ${pct}% 100%)`;
     }
-    if (textEl) {
-      textEl.textContent = `${secs}s`;
-      textEl.classList.toggle("urgent", secs <= 5);
-    }
+    if (textEl) { textEl.textContent = `${secs}s`; textEl.classList.toggle("urgent", secs <= 5); }
     if (secs >= 1 && secs <= 5) {
       const k = `${roomState.turnDeadline}_${secs}`;
       if (lastTickKey !== k) { lastTickKey = k; SoundEngine.tick(secs <= 2); }
@@ -241,9 +253,7 @@ function tickTimers() {
     if (remainingMs === 0 && isHost && lastHandledTurnDeadline !== roomState.turnDeadline) {
       lastHandledTurnDeadline = roomState.turnDeadline;
       const activePlayer = roomState.players[roomState.turnIndex];
-      if (activePlayer) {
-        handleAction(activePlayer.id, roomState.currentBet - activePlayer.bet === 0 ? "check-call" : "fold", 0, true);
-      }
+      if (activePlayer) handleAction(activePlayer.id, roomState.currentBet - activePlayer.bet === 0 ? "check-call" : "fold", 0, true);
     }
   }
 
@@ -268,13 +278,11 @@ function tickTimers() {
       lastHandledNextHandDeadline = roomState.nextHandDeadline;
       startNewHand();
     }
-  } else if (nextPill) {
-    nextPill.classList.add("hidden");
-  }
+  } else if (nextPill) nextPill.classList.add("hidden");
 }
 
 /* ============================================================================
-   3. SALDO E RENDERIZAÇÃO DA INTERFACE (ZYNGA + 3D LED + SHOWDOWN)
+   3. SALDO E RENDERIZAÇÃO DA MESA
    ============================================================================ */
 function settleHandBalanceIfNeeded(forceLeave = false) {
   if (!roomState || !getCurrentUser()) return;
@@ -299,10 +307,7 @@ function settleHandBalanceIfNeeded(forceLeave = false) {
 
 function renderPotChipsHTML(amount) {
   if (!amount || amount <= 0) return "";
-  const denoms = [
-    { v: 500, c: "chip-500" }, { v: 100, c: "chip-100" },
-    { v: 25, c: "chip-25" }, { v: 10, c: "chip-10" }, { v: 5, c: "chip-5" }
-  ];
+  const denoms = [{ v: 500, c: "chip-500" }, { v: 100, c: "chip-100" }, { v: 25, c: "chip-25" }, { v: 10, c: "chip-10" }, { v: 5, c: "chip-5" }];
   let rem = amount, html = "";
   for (const d of denoms) {
     const count = Math.min(6, Math.floor(rem / d.v));
@@ -333,17 +338,14 @@ function renderGame() {
     SoundEngine.playEvent(roomState.lastEvent.type);
   }
 
-  const players = roomState.players || [];
-  const community = roomState.community || [];
-  const isShowdown = roomState.phase === "SHOWDOWN";
-  const isWaiting = roomState.phase === "WAITING";
-  const winCardsSet = new Set(roomState.winningCards || []);
-  const winnerIdsSet = new Set(roomState.winnerIds || []);
+  const players = roomState.players || [], community = roomState.community || [];
+  const isShowdown = roomState.phase === "SHOWDOWN", isWaiting = roomState.phase === "WAITING";
+  const winCardsSet = new Set(roomState.winningCards || []), winnerIdsSet = new Set(roomState.winnerIds || []);
   const hasCardHighlights = isShowdown && winCardsSet.size > 0;
 
   const tableEl = document.querySelector(".poker-table");
   const visibleSeats = players.length > 5 ? 6 : 5;
-  if (tableEl) tableEl.classList.toggle("six-players", visibleSeats === 6);
+  tableEl?.classList.toggle("six-players", visibleSeats === 6);
 
   if ($("display-room-code")) $("display-room-code").textContent = currentRoomCode || "DEMO";
   if ($("display-phase")) $("display-phase").textContent = isWaiting ? "A AGUARDAR" : roomState.phase;
@@ -368,13 +370,12 @@ function renderGame() {
     } else sidePotsEl.classList.add("hidden");
   }
 
-  const isHost = roomState.hostId === myId;
-  const funded = players.filter(p => p.chips > 0).length;
+  const isHost = roomState.hostId === myId, funded = players.filter(p => p.chips > 0).length;
   if ($("btn-start-game")) {
     $("btn-start-game").classList.toggle("hidden", !(isHost && funded >= 2 && (isWaiting || isShowdown)));
     $("btn-start-game").textContent = isShowdown ? "Saltar Espera" : "Começar Já";
   }
-  if ($("btn-new-match")) $("btn-new-match").classList.toggle("hidden", !(isHost && isShowdown && funded < 2));
+  $("btn-new-match")?.classList.toggle("hidden", !(isHost && isShowdown && funded < 2));
 
   if ($("community-cards")) {
     $("community-cards").innerHTML = community.map(c =>
@@ -384,10 +385,8 @@ function renderGame() {
 
   const bannerEl = $("winning-hand-banner");
   if (bannerEl) {
-    if (isShowdown && roomState.winningHandName) {
-      bannerEl.textContent = roomState.winningHandName.toUpperCase();
-      bannerEl.classList.remove("hidden");
-    } else bannerEl.classList.add("hidden");
+    if (isShowdown && roomState.winningHandName) { bannerEl.textContent = roomState.winningHandName.toUpperCase(); bannerEl.classList.remove("hidden"); }
+    else bannerEl.classList.add("hidden");
   }
 
   const myIndex = players.findIndex(p => p.id === myId);
@@ -406,14 +405,11 @@ function renderGame() {
       continue;
     }
 
-    const isMe = p.id === myId;
-    const isTurn = roomState.turnIndex === pIdx;
-    const isWinner = isShowdown && winnerIdsSet.has(p.id);
-    const inHand = !p.folded && p.hand && p.hand.length === 2;
+    const isMe = p.id === myId, isTurn = roomState.turnIndex === pIdx, isWinner = isShowdown && winnerIdsSet.has(p.id);
+    const inHand = !p.folded && p.hand?.length === 2;
     const showCards = isMe || (roomState.isRunout && !p.folded) || (isShowdown && !p.folded && hasCardHighlights);
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${inHand ? "has-cards" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
-
     const betPill = p.bet > 0 ? `<div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div>` : "";
     const ringInner = `
       ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
@@ -425,32 +421,18 @@ function renderGame() {
       const heroCards = inHand ? `<div class="hero-cards">${p.hand.map(c =>
         renderCardHTML(c, false, false, hasCardHighlights ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
       ).join("")}</div>` : "";
-      el.innerHTML = `
-        <div class="seat-avatar-stack">
-          ${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}
-          <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>
-          ${heroCards}
-        </div>
-        <div class="seat-chips">${p.chips} €</div>
-        ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
+      el.innerHTML = `<div class="seat-avatar-stack">${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}<div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>${heroCards}</div><div class="seat-chips">${p.chips} €</div>${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
     } else {
       const oppCards = inHand ? `<div class="opp-cards ${showCards ? "revealed" : ""}">${p.hand.map(c =>
         renderCardHTML(c, !showCards, !showCards, (hasCardHighlights && showCards) ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
       ).join("")}</div>` : "";
-      el.innerHTML = `
-        ${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}
-        <div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div>
-        <div class="seat-chips">${p.chips} €</div>
-        ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
+      el.innerHTML = `${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}<div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div><div class="seat-chips">${p.chips} €</div>${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
     }
   }
 
-  const me = players[myIndex];
-  const user = getCurrentUser();
-  if ($("btn-rebuy")) {
-    const okRebuy = Boolean(me && me.chips === 0 && (!user || user.balance >= BIG_BLIND) && (me.folded || isShowdown || isWaiting));
-    $("btn-rebuy").classList.toggle("hidden", !okRebuy);
-  }
+  const me = players[myIndex], user = getCurrentUser();
+  $("btn-rebuy")?.classList.toggle("hidden", !Boolean(me && me.chips === 0 && (!user || user.balance >= BIG_BLIND) && (me.folded || isShowdown || isWaiting)));
+
   if ($("hand-strength-badge")) {
     if (me && !me.folded && me.hand?.length === 2) {
       const all = [...me.hand, ...community];
@@ -461,29 +443,22 @@ function renderGame() {
   const isMyTurn = Boolean(me && !roomState.isRunout && roomState.turnIndex === myIndex && !me.folded && !me.allIn);
   if (isMyTurn && !wasMyTurn) setTimeout(() => SoundEngine.myTurn(), 180);
   wasMyTurn = isMyTurn;
-  if ($("action-bar")) $("action-bar").classList.toggle("disabled", !isMyTurn);
+  $("action-bar")?.classList.toggle("disabled", !isMyTurn);
 
   if (isMyTurn) {
-    const toCall = Math.max(0, roomState.currentBet - me.bet);
-    const callAmt = Math.min(toCall, me.chips);
-    if ($("btn-check-call")) {
-      $("btn-check-call").textContent = toCall === 0 ? "Check" : (callAmt >= me.chips ? `Call All-In (${callAmt}€)` : `Call ${callAmt}€`);
-    }
-    const maxR = me.bet + me.chips;
-    const canR = me.chips > toCall;
-    const minR = Math.min(maxR, roomState.currentBet + roomState.minRaise);
+    const toCall = Math.max(0, roomState.currentBet - me.bet), callAmt = Math.min(toCall, me.chips);
+    if ($("btn-check-call")) $("btn-check-call").textContent = toCall === 0 ? "Check" : (callAmt >= me.chips ? `Call All-In (${callAmt}€)` : `Call ${callAmt}€`);
+    const maxR = me.bet + me.chips, canR = me.chips > toCall, minR = Math.min(maxR, roomState.currentBet + roomState.minRaise);
     const slider = $("raise-slider");
     if (slider) slider.disabled = !canR;
     if ($("btn-raise")) $("btn-raise").disabled = !canR;
-    if ($("raise-row")) $("raise-row").classList.toggle("disabled-raise", !canR);
+    $("raise-row")?.classList.toggle("disabled-raise", !canR);
 
     const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
     if (slider && lastSliderTurnKey !== turnKey) {
       lastSliderTurnKey = turnKey;
       slider.step = (maxR - minR) % 10 === 0 ? 10 : 1;
-      slider.min = minR;
-      slider.max = maxR;
-      slider.value = minR;
+      slider.min = minR; slider.max = maxR; slider.value = minR;
       if ($("raise-value")) $("raise-value").textContent = minR;
     }
   }
@@ -493,15 +468,19 @@ function renderGame() {
 }
 
 /* ============================================================================
-   4. AUTENTICAÇÃO, LOBBY E CONTROLOS
+   4. AUTENTICAÇÃO, HUB DE CARDS, PERFIL E SALAS
    ============================================================================ */
 function openGameScreen() {
   trackedHandId = 0; handSettled = false;
-  if ($("lobby-screen")) $("lobby-screen").classList.remove("active");
-  if ($("game-screen")) $("game-screen").classList.add("active");
+  $("online-modal")?.classList.add("hidden");
+  showScreen("game-screen");
   startTimerLoop();
 }
-function showError(msg) { if ($("lobby-error")) $("lobby-error").textContent = msg; }
+
+function showError(msg) {
+  if ($("lobby-error")) $("lobby-error").textContent = msg;
+  if ($("hub-error")) $("hub-error").textContent = msg;
+}
 
 function getLoggedBuyInOrError() {
   const user = getCurrentUser();
@@ -513,23 +492,64 @@ function getLoggedBuyInOrError() {
 let authMode = "login";
 function setAuthMode(mode) {
   authMode = mode;
-  if ($("tab-login")) $("tab-login").classList.toggle("active", mode === "login");
-  if ($("tab-register")) $("tab-register").classList.toggle("active", mode === "register");
+  $("tab-login")?.classList.toggle("active", mode === "login");
+  $("tab-register")?.classList.toggle("active", mode === "register");
   if ($("btn-auth-submit")) $("btn-auth-submit").textContent = mode === "login" ? "Entrar" : "Criar Conta (+100 000 €)";
-  if ($("auth-hint")) $("auth-hint").classList.toggle("hidden", mode !== "register");
+  $("auth-hint")?.classList.toggle("hidden", mode !== "register");
   if ($("auth-error")) $("auth-error").textContent = "";
 }
 
 function renderAuthUI(user) {
-  const logged = Boolean(user);
-  if ($("auth-panel")) $("auth-panel").classList.toggle("hidden", logged);
-  if ($("play-panel")) $("play-panel").classList.toggle("hidden", !logged);
-  if (logged) {
-    myName = user.username;
-    if ($("profile-username")) $("profile-username").textContent = user.username;
-    if ($("profile-balance")) $("profile-balance").textContent = formatEuro(user.balance);
-    if ($("profile-stats")) $("profile-stats").textContent = `${user.handsPlayed} mãos • ${user.handsWon} vitórias`;
+  if (!user) {
+    $("online-modal")?.classList.add("hidden");
+    showScreen("auth-screen");
+    return;
   }
+
+  myName = user.username;
+  const initial = (user.username.trim()[0] || "J").toUpperCase();
+  const level = Math.floor(user.handsPlayed / 10) + 1;
+  const xpPct = Math.max(8, ((user.handsPlayed % 10) / 10) * 100);
+  const winRate = user.handsPlayed > 0 ? Math.round((user.handsWon / user.handsPlayed) * 100) : 0;
+  const profit = user.balance - INITIAL_BALANCE;
+  const balFormatted = formatEuro(user.balance);
+
+  // Atualizar Hub
+  if ($("hub-avatar-letter")) $("hub-avatar-letter").textContent = initial;
+  if ($("hub-username")) $("hub-username").textContent = user.username;
+  if ($("hub-level")) $("hub-level").textContent = `LVL ${level}`;
+  if ($("hub-xp-fill")) $("hub-xp-fill").style.width = `${xpPct}%`;
+  if ($("hub-balance")) $("hub-balance").textContent = balFormatted;
+  if ($("card-profile-summary")) $("card-profile-summary").textContent = `${user.handsWon} vitórias • ${winRate}%`;
+
+  // Atualizar Perfil Completo
+  if ($("prof-top-balance")) $("prof-top-balance").textContent = balFormatted;
+  if ($("prof-avatar-letter")) $("prof-avatar-letter").textContent = initial;
+  if ($("prof-username")) $("prof-username").textContent = user.username;
+  if ($("prof-level")) $("prof-level").textContent = `LVL ${level}`;
+  if ($("prof-xp-fill")) $("prof-xp-fill").style.width = `${xpPct}%`;
+  if ($("prof-balance")) $("prof-balance").textContent = balFormatted;
+
+  const profitEl = $("prof-profit");
+  if (profitEl) {
+    const sign = profit > 0 ? "+" : "";
+    profitEl.textContent = `Lucro/Prejuízo: ${sign}${formatEuro(profit)}`;
+    profitEl.className = `profile-profit-pill ${profit > 0 ? "pos" : profit < 0 ? "neg" : ""}`;
+  }
+
+  if ($("stat-wins")) $("stat-wins").textContent = user.handsWon;
+  if ($("stat-winrate")) $("stat-winrate").textContent = `${winRate}% vitórias`;
+  if ($("stat-played")) $("stat-played").textContent = user.handsPlayed;
+  if ($("stat-folds")) $("stat-folds").textContent = user.foldsCount;
+  if ($("stat-allins")) $("stat-allins").textContent = user.allInsCount;
+  if ($("stat-raises")) $("stat-raises").textContent = user.raisesCount;
+  if ($("stat-calls")) $("stat-calls").textContent = user.callsCount;
+  if ($("stat-checks")) $("stat-checks").textContent = user.checksCount;
+  if ($("stat-biggest-win")) $("stat-biggest-win").textContent = formatEuro(user.biggestWin);
+  if ($("stat-best-streak")) $("stat-best-streak").textContent = `Melhor série: ${user.bestStreak}`;
+
+  // Só muda de ecrã se estiver no login (não expulsa o jogador da mesa nem do perfil!)
+  if (getActiveScreenId() === "auth-screen") showScreen("hub-screen");
 }
 
 async function handleAuthSubmit() {
@@ -556,6 +576,18 @@ on("auth-pin", "input", (e) => { e.target.value = e.target.value.replace(/\D/g, 
 on("btn-auth-submit", "click", handleAuthSubmit);
 on("auth-pin", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); handleAuthSubmit(); } });
 on("btn-logout", "click", () => { logoutUser(); setAuthMode("login"); });
+
+// Navegação dos Cards do Hub
+const openOnlineModal = () => { SoundEngine.init(); showError(""); $("online-modal")?.classList.remove("hidden"); };
+const openProfile = () => { SoundEngine.init(); showError(""); showScreen("profile-screen"); };
+
+on("card-play-online", "click", openOnlineModal);
+on("btn-close-online-modal", "click", () => $("online-modal")?.classList.add("hidden"));
+$("online-modal")?.addEventListener("click", (e) => { if (e.target === $("online-modal")) $("online-modal").classList.add("hidden"); });
+
+on("card-open-profile", "click", openProfile);
+on("hub-profile-trigger", "click", openProfile);
+on("btn-profile-back", "click", () => showScreen("hub-screen"));
 
 setAuthMode("login");
 initUserSystem(db, renderAuthUI);
@@ -587,9 +619,8 @@ on("btn-create-room", "click", async () => {
     const initial = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
     await withTimeout(set(ref(db, `rooms/${currentRoomCode}`), initial));
     roomState = initial; openGameScreen(); renderGame(); subscribeToRoom(currentRoomCode);
-  } catch (err) {
-    showError(String(err?.message || err));
-  } finally { btn.disabled = false; btn.textContent = prev; }
+  } catch (err) { showError(String(err?.message || err)); }
+  finally { btn.disabled = false; btn.textContent = prev; }
 });
 
 on("btn-join-room", "click", async () => {
@@ -614,14 +645,13 @@ on("btn-join-room", "click", async () => {
     });
     await withTimeout(update(ref(db, `rooms/${code}`), { players: data.players }));
     roomState = data; subscribeToRoom(code); openGameScreen(); renderGame();
-  } catch (err) {
-    showError(String(err?.message || err));
-  } finally { btn.disabled = false; btn.textContent = prev; }
+  } catch (err) { showError(String(err?.message || err)); }
+  finally { btn.disabled = false; btn.textContent = prev; }
 });
 
 on("room-code", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-join-room")?.click(); } });
 
-on("btn-demo-mode", "click", () => {
+function startBotsGame() {
   SoundEngine.init(); showError("");
   const entry = getLoggedBuyInOrError(); if (!entry) return;
   myName = entry.name; localMode = true; currentRoomCode = "OFFLINE";
@@ -632,7 +662,9 @@ on("btn-demo-mode", "click", () => {
     participated: false, isBot: true, status: ""
   }));
   roomState = demo; openGameScreen(); startNewHand();
-});
+}
+
+on("card-play-bots", "click", startBotsGame);
 
 function setQuickRaise(mode) {
   const me = roomState?.players.find(p => p.id === myId), slider = $("raise-slider");
@@ -677,9 +709,7 @@ on("btn-leave", "click", () => {
   trackedHandId = 0; handSettled = false; stopTimerLoop();
   if (unsubscribeRoom) unsubscribeRoom();
   roomState = null; wasMyTurn = false;
-  $("game-screen")?.classList.remove("active");
-  $("lobby-screen")?.classList.add("active");
-  if (document.fullscreenElement || document.webkitFullscreenElement) exitFullscreenMode();
+  showScreen(getCurrentUser() ? "hub-screen" : "auth-screen");
 });
 
 /* ============================================================================
@@ -714,7 +744,6 @@ on("btn-install-app", "click", async () => {
 on("btn-close-ios-modal", "click", () => iosModal?.classList.add("hidden"));
 iosModal?.addEventListener("click", (e) => { if (e.target === iosModal) iosModal.classList.add("hidden"); });
 
-const fullscreenBtn = $("btn-fullscreen"), rotateHint = $("rotate-hint");
 const canFullscreen = Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
 const isInFullscreen = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement || window.matchMedia("(display-mode: fullscreen)").matches);
 const updateFullscreenState = () => document.body.classList.toggle("is-fullscreen", isInFullscreen());
@@ -738,17 +767,20 @@ async function exitFullscreenMode() {
   updateFullscreenState();
 }
 
-if (fullscreenBtn) {
-  if (!canFullscreen) fullscreenBtn.classList.add("hidden");
-  else fullscreenBtn.addEventListener("click", () => isInFullscreen() ? exitFullscreenMode() : enterFullscreenLandscape());
-}
+const toggleFullscreen = () => isInFullscreen() ? exitFullscreenMode() : enterFullscreenLandscape();
+["btn-fullscreen", "btn-hub-fullscreen"].forEach(id => {
+  const btn = $(id);
+  if (!btn) return;
+  if (!canFullscreen) btn.classList.add("hidden");
+  else btn.addEventListener("click", toggleFullscreen);
+});
+
 document.addEventListener("fullscreenchange", updateFullscreenState);
 document.addEventListener("webkitfullscreenchange", updateFullscreenState);
 window.addEventListener("resize", updateFullscreenState);
 updateFullscreenState();
 
 on("btn-rotate-landscape", "click", enterFullscreenLandscape);
-on("btn-dismiss-rotate", "click", () => rotateHint?.classList.add("dismissed"));
 document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
 let lastTouchEnd = 0;
 document.addEventListener("touchend", (e) => {
