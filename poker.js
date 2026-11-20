@@ -296,6 +296,7 @@ export function normalizeRoomState(raw) {
     players: playersArr.filter(Boolean).map(p => ({
       id: p.id,
       name: p.name || "Jogador",
+      avatar: p.avatar || "initial",
       chips: Number(p.chips) || 0,
       handStartChips: p.handStartChips !== undefined ? Number(p.handStartChips) : (Number(p.chips) || 0),
       bet: Number(p.bet) || 0,
@@ -345,7 +346,7 @@ export function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIP
     message: "A preparar mesa...",
     players: [
       {
-        id: hostId, name: hostName, chips: initialChips, handStartChips: initialChips,
+        id: hostId, name: hostName, avatar: stakes.hostAvatar || "initial", chips: initialChips, handStartChips: initialChips,
         bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
         participated: false, isBot: false, status: "PRONTO"
       }
