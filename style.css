@@ -2,11 +2,11 @@
   --bg-dark: #071321;
   --panel: #102033;
   --panel-border: #243b55;
-  --felt-center: #146c43;
-  --felt-mid: #0e4f31;
+  --felt-center: #157347;
+  --felt-mid: #0e5233;
   --felt-edge: #072b1a;
-  --rail-outer: #1a100c;
-  --rail-inner: #3b2217;
+  --rail-outer: #26160e;
+  --rail-inner: #5c3a24;
   --gold: #f5b942;
   --ice-bright: #e0f2fe;
   --ice-cyan: #38bdf8;
@@ -35,7 +35,7 @@ body {
 }
 
 body {
-  background: radial-gradient(circle at 50% 15%, #112a46 0%, #071321 55%, #030912 100%);
+  background: radial-gradient(circle at 50% 18%, #112a46 0%, #071321 58%, #030912 100%);
   color: var(--text-main);
   min-height: 100vh;
   min-height: 100dvh;
@@ -358,7 +358,7 @@ input[type="text"]:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.55rem 1.2rem;
+  padding: 0.5rem 1.2rem;
   background: rgba(8, 20, 36, 0.92);
   border-bottom: 1px solid rgba(125, 211, 252, 0.2);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
@@ -385,14 +385,14 @@ input[type="text"]:focus {
   background: #0f2942;
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.35);
-  padding: 0.22rem 0.6rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 6px;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 1px;
 }
 
-/* FULLSCREEN: remove o header e deixa apenas o botão Sair no canto superior direito */
+/* FULLSCREEN: remove header e deixa apenas o botão Sair no canto superior direito */
 body.is-fullscreen #game-screen .top-bar {
   position: fixed;
   top: max(8px, env(safe-area-inset-top));
@@ -419,7 +419,7 @@ body.is-fullscreen #game-screen .top-right {
 
 body.is-fullscreen #game-screen #btn-leave {
   border-radius: 999px;
-  padding: 0.36rem 0.85rem;
+  padding: 0.34rem 0.82rem;
   font-size: 0.78rem;
   opacity: 0.92;
   border: 1px solid rgba(254, 202, 202, 0.35);
@@ -446,32 +446,32 @@ body.is-fullscreen #game-screen #btn-leave {
   }
 }
 
-/* ================= MESA DE POKER HD ================= */
+/* ================= MESA DE POKER (PROPORÇÕES COMPACTAS ZYNGA) ================= */
 .table-area {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4.8rem 5.8rem 6.6rem;
+  padding: 4.2rem 6.5rem 7.8rem;
   position: relative;
 }
 
 .poker-table {
   position: relative;
-  width: min(880px, 78vw);
-  height: min(410px, 52dvh);
-  border-radius: 225px;
+  width: min(720px, 64vw);
+  height: min(350px, 47dvh);
+  border-radius: 210px;
   background:
     radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.08) 0%, transparent 58%),
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0px, rgba(255, 255, 255, 0.012) 2px, transparent 2px, transparent 4px),
     radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 58%, var(--felt-edge) 100%);
-  border: 18px solid var(--rail-inner);
+  border: 16px solid var(--rail-inner);
   box-shadow:
-    inset 0 0 0 2px rgba(245, 185, 66, 0.35),
-    inset 0 0 70px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 2px rgba(253, 224, 71, 0.42),
+    inset 0 0 65px rgba(0, 0, 0, 0.72),
     0 0 0 4px var(--rail-outer),
-    0 0 0 6px rgba(56, 189, 248, 0.22),
-    0 28px 70px rgba(0, 0, 0, 0.82);
+    0 0 0 6px rgba(245, 185, 66, 0.18),
+    0 26px 65px rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -479,9 +479,9 @@ body.is-fullscreen #game-screen #btn-leave {
 
 .table-betting-line {
   position: absolute;
-  inset: 22px 30px;
-  border-radius: 195px;
-  border: 1.5px solid rgba(253, 224, 71, 0.22);
+  inset: 20px 28px;
+  border-radius: 185px;
+  border: 1.5px solid rgba(253, 224, 71, 0.24);
   box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.2);
   pointer-events: none;
   z-index: 1;
@@ -489,10 +489,10 @@ body.is-fullscreen #game-screen #btn-leave {
 
 .table-watermark {
   position: absolute;
-  bottom: 13%;
+  bottom: 16%;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 900;
   letter-spacing: 5px;
   color: rgba(255, 255, 255, 0.07);
@@ -505,7 +505,7 @@ body.is-fullscreen #game-screen #btn-leave {
 .dealer-seat {
   position: absolute;
   left: 50%;
-  top: -16%;
+  top: -12%;
   transform: translate(-50%, -38%);
   display: flex;
   flex-direction: column;
@@ -515,13 +515,13 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .dealer-avatar-wrap {
-  width: 76px;
-  height: 76px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   border: 3px solid var(--gold);
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.75),
-    0 0 20px rgba(245, 185, 66, 0.38),
+    0 10px 24px rgba(0, 0, 0, 0.75),
+    0 0 18px rgba(245, 185, 66, 0.38),
     inset 0 0 10px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   background: #071321;
@@ -540,14 +540,14 @@ body.is-fullscreen #game-screen #btn-leave {
   margin-top: -12px;
   background: linear-gradient(180deg, #1e293b, #0f172a);
   border: 1.5px solid var(--gold);
-  padding: 0.18rem 0.9rem;
+  padding: 0.16rem 0.85rem;
   border-radius: 999px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
   z-index: 2;
 }
 
 .dealer-tag {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 1.8px;
   color: var(--gold);
@@ -557,34 +557,34 @@ body.is-fullscreen #game-screen #btn-leave {
   background: var(--gold);
   color: #0f172a;
   font-weight: 800;
-  font-size: 0.68rem;
-  padding: 0.1rem 0.45rem;
+  font-size: 0.66rem;
+  padding: 0.08rem 0.42rem;
   border-radius: 999px;
 }
 
 .dealer-speech {
-  margin-top: 6px;
+  margin-top: 5px;
   background: rgba(7, 19, 33, 0.88);
   border: 1px solid rgba(125, 211, 252, 0.22);
   color: #e2e8f0;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 0.22rem 0.88rem;
+  padding: 0.2rem 0.82rem;
   border-radius: 999px;
   white-space: nowrap;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 .waiting-room-pill {
-  margin-top: 6px;
+  margin-top: 5px;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   background: rgba(10, 26, 46, 0.94);
   border: 1px solid rgba(56, 189, 248, 0.45);
   color: #bae6fd;
-  font-size: 0.74rem;
-  padding: 0.2rem 0.65rem;
+  font-size: 0.72rem;
+  padding: 0.18rem 0.62rem;
   border-radius: 999px;
   pointer-events: auto;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
@@ -595,9 +595,9 @@ body.is-fullscreen #game-screen #btn-leave {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   z-index: 3;
-  margin-top: 0.65rem;
+  margin-top: 0.4rem;
   position: relative;
 }
 
@@ -605,15 +605,15 @@ body.is-fullscreen #game-screen #btn-leave {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  min-height: 34px;
+  gap: 0.65rem;
+  min-height: 30px;
 }
 
 .pot-chips {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  height: 32px;
+  gap: 5px;
+  height: 28px;
 }
 
 .chip-stack {
@@ -623,11 +623,11 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .poker-chip {
-  width: 22px;
-  height: 8px;
+  width: 20px;
+  height: 7px;
   border-radius: 50%;
   border: 1.5px dashed rgba(255, 255, 255, 0.88);
-  margin-top: -3.5px;
+  margin-top: -3px;
   box-shadow:
     inset 0 2px 2px rgba(255, 255, 255, 0.35),
     inset 0 -2px 2px rgba(0, 0, 0, 0.55),
@@ -646,16 +646,16 @@ body.is-fullscreen #game-screen #btn-leave {
   gap: 0.3rem;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(7, 15, 28, 0.94));
   border: 1.5px solid rgba(245, 185, 66, 0.65);
-  padding: 0.28rem 1rem;
+  padding: 0.24rem 0.92rem;
   border-radius: 999px;
   font-weight: 800;
   color: var(--gold);
-  font-size: 0.98rem;
+  font-size: 0.94rem;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .pot-label {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
   letter-spacing: 1.2px;
 }
@@ -671,7 +671,7 @@ body.is-fullscreen #game-screen #btn-leave {
   background: rgba(7, 19, 33, 0.84);
   border: 1px solid rgba(125, 211, 252, 0.4);
   color: #bae6fd;
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   font-weight: 700;
   padding: 1px 8px;
   border-radius: 999px;
@@ -680,17 +680,17 @@ body.is-fullscreen #game-screen #btn-leave {
 .community-cards {
   display: flex;
   justify-content: center;
-  gap: 0.58rem;
-  min-height: 86px;
+  gap: 0.5rem;
+  min-height: 82px;
   align-items: center;
 }
 
 .winning-hand-banner {
   margin-top: 2px;
-  padding: 0.3rem 2.2rem;
-  font-size: 1.24rem;
+  padding: 0.28rem 2rem;
+  font-size: 1.18rem;
   font-weight: 900;
-  letter-spacing: 2.4px;
+  letter-spacing: 2.2px;
   color: #111827;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
   background: linear-gradient(
@@ -715,16 +715,16 @@ body.is-fullscreen #game-screen #btn-leave {
 
 /* ================= CARTAS HD (FRENTE E VERSO GLACIAL) ================= */
 .card {
-  width: 60px;
-  height: 86px;
+  width: 56px;
+  height: 80px;
   background: linear-gradient(155deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
   border: 1px solid rgba(15, 23, 42, 0.16);
-  border-radius: 9px;
+  border-radius: 8px;
   color: #0f172a;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 4px 5px;
+  padding: 3px 4px;
   font-weight: 900;
   box-shadow:
     0 8px 18px rgba(0, 0, 0, 0.48),
@@ -742,7 +742,7 @@ body.is-fullscreen #game-screen #btn-leave {
   flex-direction: column;
   align-items: center;
   line-height: 0.92;
-  width: 16px;
+  width: 15px;
 }
 
 .card-corner.bottom {
@@ -751,12 +751,12 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .card-rank {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   letter-spacing: -0.5px;
 }
 
 .card-suit-mini {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .card-center {
@@ -764,21 +764,21 @@ body.is-fullscreen #game-screen #btn-leave {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 1.75rem;
+  font-size: 1.65rem;
   line-height: 1;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12));
 }
 
 .card.back {
   background: linear-gradient(145deg, #f8fafc, #cbd5e1);
-  padding: 3px;
+  padding: 2.5px;
   border: 1px solid rgba(255, 255, 255, 0.85);
 }
 
 .card-back-inner {
   width: 100%;
   height: 100%;
-  border-radius: 5px;
+  border-radius: 4px;
   border: 1px solid rgba(125, 211, 252, 0.55);
   background:
     repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
@@ -791,35 +791,36 @@ body.is-fullscreen #game-screen #btn-leave {
 
 .card-back-emblem {
   color: rgba(186, 230, 253, 0.85);
-  font-size: 1.15rem;
+  font-size: 1rem;
   text-shadow: 0 0 8px rgba(56, 189, 248, 0.85);
 }
 
+/* Mini cartas dos adversários no feltro (estilo Zynga) */
 .card.small {
-  width: 42px;
-  height: 60px;
-  padding: 3px 4px;
-  border-radius: 7px;
+  width: 28px;
+  height: 40px;
+  padding: 2px;
+  border-radius: 5px;
 }
 
 .card.small .card-corner {
-  width: 12px;
+  width: 9px;
 }
 
 .card.small .card-rank {
-  font-size: 0.72rem;
-}
-
-.card.small .card-suit-mini {
   font-size: 0.56rem;
 }
 
+.card.small .card-suit-mini {
+  font-size: 0.44rem;
+}
+
 .card.small .card-center {
-  font-size: 1.15rem;
+  font-size: 0.82rem;
 }
 
 .card.small .card-back-emblem {
-  font-size: 0.85rem;
+  font-size: 0.62rem;
 }
 
 .card.card-win {
@@ -827,12 +828,12 @@ body.is-fullscreen #game-screen #btn-leave {
   box-shadow:
     0 0 18px 4px rgba(251, 191, 36, 0.9),
     0 0 8px 1px rgba(255, 255, 255, 0.85);
-  z-index: 6 !important;
+  z-index: 8 !important;
   filter: brightness(1.06);
 }
 
 .community-cards .card.card-win {
-  transform: translateY(-7px) scale(1.06);
+  transform: translateY(-6px) scale(1.06);
 }
 
 .card.card-dim {
@@ -840,7 +841,7 @@ body.is-fullscreen #game-screen #btn-leave {
   opacity: 0.82;
 }
 
-/* ================= 6 LUGARES CIRCULARES + CARTAS SEMPRE ATRÁS DO TOPO ================= */
+/* ================= LUGARES NO ESQUEMA ZYNGA (5 LUGARES PADRÃO + 6 LUGARES) ================= */
 .seats-container {
   position: absolute;
   inset: 0;
@@ -849,7 +850,7 @@ body.is-fullscreen #game-screen #btn-leave {
 
 .seat {
   position: absolute;
-  width: 118px;
+  width: 112px;
   transform: translate(-50%, -50%);
   pointer-events: auto;
   display: flex;
@@ -858,12 +859,21 @@ body.is-fullscreen #game-screen #btn-leave {
   transition: opacity 0.25s ease;
 }
 
-.seat-0 { left: 30%; top: 112%; }
-.seat-1 { left: -8%; top: 52%; }
-.seat-2 { left: 17%; top: -10%; }
-.seat-3 { left: 83%; top: -10%; }
-.seat-4 { left: 108%; top: 52%; }
-.seat-5 { left: 70%; top: 112%; }
+/* Padrão até 5 jogadores — EXATO ESQUEMA ZYNGA (Tu no centro inferior) */
+.seat-0 { left: 50%; top: 103%; }  /* Tu (Centro inferior) */
+.seat-1 { left: 5%;  top: 78%;  }  /* Inferior esquerdo */
+.seat-2 { left: 19%; top: -4%;  }  /* Superior esquerdo */
+.seat-3 { left: 81%; top: -4%;  }  /* Superior direito */
+.seat-4 { left: 95%; top: 78%;  }  /* Inferior direito */
+.seat-5 { display: none; }         /* Oculto até existir 6.º jogador */
+
+/* Modo 6 jogadores (simétrico) */
+.poker-table.six-players .seat-0 { left: 32%; top: 103%; }
+.poker-table.six-players .seat-1 { left: -2%; top: 52%;  }
+.poker-table.six-players .seat-2 { left: 20%; top: -4%;  }
+.poker-table.six-players .seat-3 { left: 80%; top: -4%;  }
+.poker-table.six-players .seat-4 { left: 102%; top: 52%; }
+.poker-table.six-players .seat-5 { display: flex; left: 68%; top: 103%; }
 
 .seat-avatar-stack {
   position: relative;
@@ -872,81 +882,162 @@ body.is-fullscreen #game-screen #btn-leave {
   align-items: center;
 }
 
-.seat-cards {
+/* ---- CARTAS DO HERÓI ("TU"): À FRENTE DA METADE INFERIOR DO CÍRCULO (ESTILO ZYNGA) ---- */
+.hero-cards {
   position: absolute;
-  bottom: 54%;
+  top: 48%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1;
+  z-index: 6;
   pointer-events: none;
 }
 
-.seat-cards .card:first-child {
-  transform: rotate(-11deg);
-  margin-right: -12px;
+.hero-cards .card {
+  width: 52px;
+  height: 74px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.72), 0 0 12px rgba(56, 189, 248, 0.25);
+}
+
+.hero-cards .card:first-child {
+  transform: rotate(-10deg);
+  margin-right: -11px;
   z-index: 1;
 }
 
-.seat-cards .card:last-child {
-  transform: rotate(11deg);
+.hero-cards .card:last-child {
+  transform: rotate(10deg);
   z-index: 2;
 }
 
-.seat-cards.my-cards {
-  bottom: 58%;
+/* Nome do herói sobe para a metade superior do círculo quando tem cartas */
+.seat.is-me.has-cards .seat-circle {
+  justify-content: flex-start;
+  padding-top: 9px;
 }
 
-.seat-cards.my-cards .card {
-  width: 54px;
-  height: 76px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.58), 0 0 12px rgba(56, 189, 248, 0.25);
+.seat.is-me.has-cards .seat-chips {
+  margin-top: 34px;
 }
 
-.seat-cards.my-cards .card.card-win {
-  box-shadow:
-    0 0 18px 4px rgba(251, 191, 36, 0.95),
-    0 0 8px 1px rgba(255, 255, 255, 0.85);
-}
-
-.seat-bet-zone {
+/* Aposta do Herói: SEMPRE acima do círculo, dentro do feltro (nunca tapa as cartas!) */
+.seat-0 .hero-bet-zone {
   position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
   pointer-events: none;
 }
 
-.seat-0 .seat-bet-zone,
-.seat-5 .seat-bet-zone {
-  bottom: 132%;
-  left: 50%;
-  transform: translateX(-50%);
+/* ---- ADVERSÁRIOS: CARTAS + APOSTA LADO A LADO DENTRO DO FELTRO (ESTILO ZYNGA) ---- */
+.seat-felt-zone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 5;
+  pointer-events: none;
 }
 
-.seat-2 .seat-bet-zone,
-.seat-3 .seat-bet-zone {
+.opp-cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.opp-cards .card:first-child {
+  transform: rotate(-10deg);
+  margin-right: -8px;
+  z-index: 1;
+}
+
+.opp-cards .card:last-child {
+  transform: rotate(10deg);
+  z-index: 2;
+}
+
+/* Quando reveladas no Showdown ou Run-out, as cartas dos adversários crescem para leitura perfeita */
+.opp-cards.revealed .card {
+  width: 48px;
+  height: 68px;
+  padding: 3px 4px;
+  border-radius: 7px;
+}
+
+.opp-cards.revealed .card-corner {
+  width: 13px;
+}
+
+.opp-cards.revealed .card-rank {
+  font-size: 0.78rem;
+}
+
+.opp-cards.revealed .card-suit-mini {
+  font-size: 0.6rem;
+}
+
+.opp-cards.revealed .card-center {
+  font-size: 1.35rem;
+}
+
+/* Posicionamento no feltro por lugar (5 lugares padrão) */
+.seat-1 .seat-felt-zone {
+  left: 96%;
+  top: 22%;
+  flex-direction: row;
+}
+
+.seat-2 .seat-felt-zone {
   top: 108%;
+  left: 56%;
+  transform: translateX(-50%);
+  flex-direction: row-reverse;
+}
+
+.seat-3 .seat-felt-zone {
+  top: 108%;
+  left: 44%;
+  transform: translateX(-50%);
+  flex-direction: row;
+}
+
+.seat-4 .seat-felt-zone {
+  right: 96%;
+  top: 22%;
+  flex-direction: row-reverse;
+}
+
+/* Ajustes de zona no feltro para modo 6 lugares */
+.poker-table.six-players .seat-1 .seat-felt-zone {
+  left: 98%;
+  top: 42%;
+  transform: translateY(-50%);
+  flex-direction: row;
+}
+
+.poker-table.six-players .seat-4 .seat-felt-zone {
+  right: 98%;
+  top: 42%;
+  transform: translateY(-50%);
+  flex-direction: row-reverse;
+}
+
+.poker-table.six-players .seat-5 .seat-felt-zone {
+  bottom: 112%;
   left: 50%;
   transform: translateX(-50%);
+  flex-direction: row;
 }
 
-.seat-1 .seat-bet-zone {
-  left: 108%;
-  top: 45%;
-  transform: translateY(-50%);
-}
-
-.seat-4 .seat-bet-zone {
-  right: 108%;
-  top: 45%;
-  transform: translateY(-50%);
-}
-
+/* Círculo do Jogador */
 .seat-ring {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
   padding: 3px;
   background: linear-gradient(145deg, #3b5b82, #17273b);
@@ -960,13 +1051,15 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .seat.is-me .seat-ring {
+  width: 84px;
+  height: 84px;
   background: linear-gradient(135deg, #7dd3fc, #0284c7);
   box-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 8px 20px rgba(0, 0, 0, 0.65);
 }
 
 .seat.active-turn .seat-ring {
   padding: 4px;
-  box-shadow: 0 0 24px rgba(245, 185, 66, 0.65);
+  box-shadow: 0 0 24px rgba(245, 185, 66, 0.68);
 }
 
 .seat.is-winner .seat-ring {
@@ -986,19 +1079,19 @@ body.is-fullscreen #game-screen #btn-leave {
 
 .winner-badge {
   position: absolute;
-  bottom: -6px;
+  top: -10px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(180deg, #fef08a 0%, #f59e0b 100%);
   color: #111827;
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 1px;
-  padding: 2px 10px;
+  padding: 2px 9px;
   border-radius: 999px;
   border: 1.5px solid #fffbeb;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
-  z-index: 7;
+  z-index: 9;
   white-space: nowrap;
 }
 
@@ -1022,26 +1115,28 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .seat.empty .seat-ring {
+  width: 58px;
+  height: 58px;
   background: transparent;
-  border: 2px dashed rgba(125, 211, 252, 0.32);
+  border: 1.5px dashed rgba(125, 211, 252, 0.25);
   box-shadow: none;
 }
 
 .seat.empty .seat-circle {
-  background: rgba(16, 32, 51, 0.45);
+  background: rgba(16, 32, 51, 0.28);
 }
 
 .seat-empty-label {
-  font-size: 0.76rem;
-  color: var(--text-muted);
+  font-size: 0.68rem;
+  color: rgba(148, 163, 184, 0.7);
   font-weight: 600;
 }
 
 .seat-name {
   font-weight: 800;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: #f8fafc;
-  line-height: 1.15;
+  line-height: 1.1;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
@@ -1049,7 +1144,7 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .seat-you-tag {
-  font-size: 0.58rem;
+  font-size: 0.56rem;
   font-weight: 800;
   color: #38bdf8;
   letter-spacing: 1px;
@@ -1057,22 +1152,27 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .seat-chips {
-  margin-top: 7px;
-  font-size: 0.84rem;
-  color: var(--gold);
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: #ffffff;
   font-weight: 800;
   background: rgba(7, 19, 33, 0.9);
-  border: 1px solid rgba(245, 185, 66, 0.42);
+  border: 1px solid rgba(245, 185, 66, 0.45);
   padding: 2px 10px;
   border-radius: 999px;
   white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
-  z-index: 4;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+  z-index: 7;
+}
+
+.seat.is-me .seat-chips {
+  color: var(--gold);
+  border-color: rgba(245, 185, 66, 0.65);
 }
 
 .seat-status {
   margin-top: 3px;
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   font-weight: 700;
   color: #7dd3fc;
   text-transform: uppercase;
@@ -1081,15 +1181,15 @@ body.is-fullscreen #game-screen #btn-leave {
   padding: 1px 7px;
   border-radius: 999px;
   white-space: nowrap;
-  z-index: 4;
+  z-index: 7;
 }
 
 .turn-timer-text {
   position: absolute;
   top: -6px;
   left: -6px;
-  z-index: 7;
-  font-size: 0.7rem;
+  z-index: 8;
+  font-size: 0.68rem;
   font-weight: 800;
   color: var(--gold);
   background: #0f172a;
@@ -1109,18 +1209,18 @@ body.is-fullscreen #game-screen #btn-leave {
   position: absolute;
   top: -4px;
   right: -4px;
-  width: 24px;
-  height: 24px;
+  width: 23px;
+  height: 23px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 70%, #94a3b8 100%);
   color: #0f172a;
   font-weight: 900;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px solid var(--gold);
-  z-index: 7;
+  z-index: 8;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
 }
 
@@ -1129,8 +1229,8 @@ body.is-fullscreen #game-screen #btn-leave {
   align-items: center;
   gap: 5px;
   background: rgba(10, 20, 36, 0.92);
-  border: 1px solid rgba(245, 185, 66, 0.75);
-  color: var(--gold);
+  border: 1px solid rgba(245, 185, 66, 0.8);
+  color: #fef08a;
   font-size: 0.74rem;
   font-weight: 800;
   padding: 2px 9px 2px 6px;
@@ -1158,7 +1258,7 @@ body.is-fullscreen #game-screen #btn-leave {
   padding:
     0
     max(14px, env(safe-area-inset-right))
-    max(12px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-bottom))
     max(14px, env(safe-area-inset-left));
   display: flex;
   justify-content: space-between;
@@ -1172,7 +1272,7 @@ body.is-fullscreen #game-screen #btn-leave {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.45rem;
+  gap: 0.4rem;
   pointer-events: none;
 }
 
@@ -1184,12 +1284,12 @@ body.is-fullscreen #game-screen #btn-leave {
 }
 
 .hand-strength {
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   color: var(--gold);
   font-weight: 700;
   background: rgba(7, 19, 33, 0.88);
   border: 1px solid rgba(245, 185, 66, 0.4);
-  padding: 0.34rem 0.9rem;
+  padding: 0.3rem 0.85rem;
   border-radius: 999px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
@@ -1200,15 +1300,15 @@ body.is-fullscreen #game-screen #btn-leave {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.48rem;
+  gap: 0.45rem;
   background: rgba(8, 20, 36, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(125, 211, 252, 0.25);
-  border-radius: 16px;
-  padding: 0.55rem 0.65rem;
+  border-radius: 15px;
+  padding: 0.5rem 0.6rem;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .action-dock.disabled {
@@ -1220,7 +1320,7 @@ body.is-fullscreen #game-screen #btn-leave {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.55rem;
+  gap: 0.5rem;
   transition: opacity 0.15s ease;
 }
 
@@ -1232,7 +1332,7 @@ body.is-fullscreen #game-screen #btn-leave {
 .quick-bet-group {
   display: flex;
   align-items: center;
-  gap: 0.32rem;
+  gap: 0.3rem;
 }
 
 .btn-quick {
@@ -1240,7 +1340,7 @@ body.is-fullscreen #game-screen #btn-leave {
   border: 1px solid rgba(125, 211, 252, 0.32);
   color: #bae6fd;
   border-radius: 7px;
-  padding: 0.24rem 0.52rem;
+  padding: 0.22rem 0.5rem;
   font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
@@ -1254,7 +1354,7 @@ body.is-fullscreen #game-screen #btn-leave {
 
 #raise-slider {
   flex: 1;
-  min-width: 120px;
+  min-width: 115px;
   accent-color: var(--ice-cyan);
   cursor: pointer;
 }
@@ -1262,18 +1362,18 @@ body.is-fullscreen #game-screen #btn-leave {
 .main-action-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.42rem;
 }
 
 .main-action-row .btn {
-  padding: 0.62rem 0.95rem;
-  font-size: 0.88rem;
+  padding: 0.58rem 0.9rem;
+  font-size: 0.86rem;
   white-space: nowrap;
 }
 
 .btn-fold { background: linear-gradient(180deg, #ef4444, #b91c1c); }
-.btn-call { background: linear-gradient(180deg, #22c55e, #15803d); min-width: 96px; }
-.btn-raise { background: linear-gradient(180deg, #3b82f6, #1d4ed8); min-width: 106px; }
+.btn-call { background: linear-gradient(180deg, #22c55e, #15803d); min-width: 92px; }
+.btn-raise { background: linear-gradient(180deg, #3b82f6, #1d4ed8); min-width: 102px; }
 .btn-allin { background: linear-gradient(180deg, #8b5cf6, #6d28d9); }
 
 /* ================= BOTÃO INSTALAR PWA E MODAL IOS ================= */
@@ -1335,19 +1435,19 @@ body.is-fullscreen #game-screen #btn-leave {
     height: 92px;
   }
   .table-area {
-    padding: 4.5rem 2.4rem 8.5rem;
+    padding: 4rem 2.2rem 9.5rem;
   }
   .poker-table {
-    width: 78vw;
-    height: 41dvh;
+    width: 76vw;
+    height: 40dvh;
     border-width: 10px;
   }
   .table-betting-line {
     inset: 12px 16px;
   }
   .dealer-avatar-wrap {
-    width: 54px;
-    height: 54px;
+    width: 52px;
+    height: 52px;
   }
   .winning-hand-banner {
     font-size: 0.95rem;
@@ -1355,25 +1455,30 @@ body.is-fullscreen #game-screen #btn-leave {
     letter-spacing: 1.5px;
   }
   .seat {
-    width: 84px;
+    width: 82px;
   }
   .seat-ring {
-    width: 60px;
-    height: 60px;
+    width: 56px;
+    height: 56px;
+  }
+  .seat.is-me .seat-ring {
+    width: 64px;
+    height: 64px;
+  }
+  .hero-cards .card {
+    width: 40px;
+    height: 56px;
+  }
+  .seat.is-me.has-cards .seat-chips {
+    margin-top: 24px;
   }
   .seat-name {
-    font-size: 0.68rem;
+    font-size: 0.66rem;
   }
   .seat-chips {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     padding: 1px 7px;
   }
-  .seat-0 { left: 26%; top: 112%; }
-  .seat-1 { left: -6%; top: 53%; }
-  .seat-2 { left: 14%; top: -10%; }
-  .seat-3 { left: 86%; top: -10%; }
-  .seat-4 { left: 106%; top: 53%; }
-  .seat-5 { left: 74%; top: 112%; }
   .card {
     width: 42px;
     height: 60px;
@@ -1386,12 +1491,8 @@ body.is-fullscreen #game-screen #btn-leave {
     font-size: 1.15rem;
   }
   .card.small {
-    width: 28px;
-    height: 40px;
-  }
-  .seat-cards.my-cards .card {
-    width: 38px;
-    height: 54px;
+    width: 22px;
+    height: 32px;
   }
   .dealer-speech {
     font-size: 0.66rem;
@@ -1424,7 +1525,7 @@ body.is-fullscreen #game-screen #btn-leave {
   }
 }
 
-/* ================= MOBILE HORIZONTAL (LANDSCAPE ANDROID / IOS) ================= */
+/* ================= MOBILE HORIZONTAL — ESQUEMA COMPACTO ZYNGA POKER ================= */
 @media (orientation: landscape) and (max-height: 540px) {
   /* Lobby em 2 colunas sem scroll */
   #lobby-screen {
@@ -1539,165 +1640,166 @@ body.is-fullscreen #game-screen #btn-leave {
   }
 
   .btn-sm {
-    padding: 0.28rem 0.68rem;
-    font-size: 0.74rem;
+    padding: 0.26rem 0.64rem;
+    font-size: 0.72rem;
   }
 
-  /* MESA AMPLA E DESAFOGADA EM HORIZONTAL */
+  /* MESA COMPACTA E CENTRADA COMO NA ZYNGA POKER */
   .table-area {
     padding:
-      38px
-      max(60px, env(safe-area-inset-right))
-      82px
-      max(60px, env(safe-area-inset-left));
+      28px
+      max(76px, env(safe-area-inset-right))
+      80px
+      max(76px, env(safe-area-inset-left));
   }
 
-  /* Em Fullscreen ganha o espaço do header para ficar ainda maior e mais centrada */
   body.is-fullscreen .table-area {
     padding:
-      44px
-      max(64px, env(safe-area-inset-right))
+      34px
+      max(84px, env(safe-area-inset-right))
       86px
-      max(64px, env(safe-area-inset-left));
+      max(84px, env(safe-area-inset-left));
   }
 
   .poker-table {
-    width: min(640px, 74vw);
-    height: min(230px, 56dvh);
-    border-width: 9px;
-    border-radius: 130px;
+    width: min(500px, 58vw);
+    height: min(195px, 49dvh);
+    border-width: 11px;
+    border-radius: 120px;
     box-shadow:
-      inset 0 0 0 1.5px rgba(245, 185, 66, 0.35),
-      inset 0 0 46px rgba(0, 0, 0, 0.72),
+      inset 0 0 0 1.5px rgba(253, 224, 71, 0.42),
+      inset 0 0 42px rgba(0, 0, 0, 0.72),
       0 0 0 3px var(--rail-outer),
-      0 0 0 4.5px rgba(56, 189, 248, 0.22),
-      0 14px 36px rgba(0, 0, 0, 0.8);
+      0 0 0 5px rgba(245, 185, 66, 0.16),
+      0 14px 36px rgba(0, 0, 0, 0.85);
   }
 
   body.is-fullscreen .poker-table {
-    width: min(680px, 76vw);
-    height: min(245px, 60dvh);
+    width: min(535px, 60vw);
+    height: min(210px, 53dvh);
+    border-width: 12px;
+    border-radius: 130px;
   }
 
   .table-betting-line {
-    inset: 12px 18px;
-    border-radius: 112px;
+    inset: 11px 16px;
+    border-radius: 105px;
   }
 
   .table-watermark {
-    bottom: 10%;
-    font-size: 0.66rem;
-    letter-spacing: 3.5px;
+    bottom: 13%;
+    font-size: 0.58rem;
+    letter-spacing: 3px;
   }
 
   /* Dealer no topo */
   .dealer-seat {
-    top: -11%;
-    transform: translate(-50%, -32%);
+    top: -10%;
+    transform: translate(-50%, -34%);
   }
 
   .dealer-avatar-wrap {
-    width: 48px;
-    height: 48px;
-    border-width: 2.5px;
+    width: 46px;
+    height: 46px;
+    border-width: 2px;
   }
 
   .dealer-plate {
-    margin-top: -9px;
-    padding: 0.1rem 0.6rem;
-    gap: 0.28rem;
+    margin-top: -8px;
+    padding: 0.08rem 0.55rem;
+    gap: 0.25rem;
   }
 
   .dealer-tag,
   .next-hand-pill {
-    font-size: 0.58rem;
+    font-size: 0.54rem;
   }
 
   .dealer-speech {
-    margin-top: 3px;
-    font-size: 0.65rem;
-    padding: 0.14rem 0.65rem;
-    max-width: 320px;
+    margin-top: 2px;
+    font-size: 0.6rem;
+    padding: 0.1rem 0.58rem;
+    max-width: 280px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .waiting-room-pill {
-    margin-top: 4px;
-    font-size: 0.66rem;
-    padding: 0.12rem 0.55rem;
+    margin-top: 3px;
+    font-size: 0.62rem;
+    padding: 0.1rem 0.5rem;
   }
 
   /* Centro do feltro */
   .table-center {
-    gap: 0.28rem;
-    margin-top: 0.9rem;
+    gap: 0.22rem;
+    margin-top: 0.65rem;
   }
 
   .pot-zone {
-    min-height: 22px;
-    gap: 0.45rem;
+    min-height: 20px;
+    gap: 0.4rem;
   }
 
   .pot-chips {
-    height: 22px;
+    height: 18px;
     gap: 3px;
   }
 
   .poker-chip {
-    width: 15px;
-    height: 5.5px;
+    width: 13px;
+    height: 5px;
     margin-top: -2px;
   }
 
   .pot-display {
-    padding: 0.14rem 0.7rem;
-    font-size: 0.8rem;
+    padding: 0.12rem 0.64rem;
+    font-size: 0.74rem;
   }
 
   .pot-label {
-    font-size: 0.58rem;
+    font-size: 0.54rem;
   }
 
   .side-pot-tag {
-    font-size: 0.56rem;
+    font-size: 0.54rem;
     padding: 1px 6px;
   }
 
   .community-cards {
-    gap: 0.38rem;
-    min-height: 62px;
+    gap: 0.34rem;
+    min-height: 56px;
   }
 
   .winning-hand-banner {
     margin-top: 0;
-    padding: 0.15rem 1.35rem;
-    font-size: 0.84rem;
-    letter-spacing: 1.6px;
+    padding: 0.14rem 1.2rem;
+    font-size: 0.8rem;
+    letter-spacing: 1.5px;
   }
 
-  /* Cartas HD bem legíveis em horizontal */
+  /* Cartas Comunitárias */
   .card {
-    width: 44px;
-    height: 62px;
-    padding: 2px 3.5px;
+    width: 40px;
+    height: 56px;
+    padding: 2px 3px;
     border-radius: 6px;
   }
 
   .card-corner {
-    width: 12px;
+    width: 11px;
   }
 
   .card-rank {
-    font-size: 0.74rem;
+    font-size: 0.68rem;
   }
 
   .card-suit-mini {
-    font-size: 0.55rem;
+    font-size: 0.5rem;
   }
 
   .card-center {
-    font-size: 1.24rem;
+    font-size: 1.12rem;
   }
 
   .card.back {
@@ -1705,101 +1807,160 @@ body.is-fullscreen #game-screen #btn-leave {
   }
 
   .card-back-emblem {
-    font-size: 0.86rem;
+    font-size: 0.76rem;
   }
 
   .community-cards .card.card-win {
-    transform: translateY(-5px) scale(1.06);
+    transform: translateY(-4px) scale(1.06);
   }
 
+  /* Mini cartas dos adversários (estilo Zynga) */
   .card.small {
-    width: 28px;
-    height: 40px;
-    padding: 1.5px 2px;
-    border-radius: 5px;
+    width: 21px;
+    height: 30px;
+    padding: 1.5px;
+    border-radius: 4px;
   }
 
   .card.small .card-corner {
-    width: 8px;
+    width: 7px;
   }
 
   .card.small .card-rank {
-    font-size: 0.52rem;
+    font-size: 0.46rem;
   }
 
   .card.small .card-suit-mini {
-    font-size: 0.42rem;
+    font-size: 0.36rem;
   }
 
   .card.small .card-center {
-    font-size: 0.78rem;
+    font-size: 0.66rem;
   }
 
   .card.small .card-back-emblem {
+    font-size: 0.48rem;
+  }
+
+  .opp-cards .card:first-child {
+    margin-right: -6px;
+  }
+
+  .opp-cards.revealed .card {
+    width: 34px;
+    height: 48px;
+    padding: 2px;
+    border-radius: 5px;
+  }
+
+  .opp-cards.revealed .card-rank {
     font-size: 0.6rem;
   }
 
-  .seat-cards .card:first-child {
-    margin-right: -8px;
+  .opp-cards.revealed .card-suit-mini {
+    font-size: 0.45rem;
   }
 
-  .seat-cards.my-cards {
-    bottom: 56%;
+  .opp-cards.revealed .card-center {
+    font-size: 0.95rem;
   }
 
-  .seat-cards.my-cards .card {
-    width: 40px;
-    height: 56px;
+  /* Cartas do Herói na metade inferior da frente do círculo */
+  .hero-cards {
+    top: 46%;
+  }
+
+  .hero-cards .card {
+    width: 38px;
+    height: 52px;
     padding: 2px 3px;
     border-radius: 6px;
   }
 
-  .seat-cards.my-cards .card-rank {
-    font-size: 0.68rem;
+  .hero-cards .card:first-child {
+    margin-right: -8px;
   }
 
-  .seat-cards.my-cards .card-suit-mini {
-    font-size: 0.5rem;
+  .hero-cards .card-rank {
+    font-size: 0.66rem;
   }
 
-  .seat-cards.my-cards .card-center {
-    font-size: 1.06rem;
+  .hero-cards .card-suit-mini {
+    font-size: 0.48rem;
   }
 
-  /* 6 Lugares afastados para fora da mesa sem colidir com o HUD */
+  .hero-cards .card-center {
+    font-size: 1.02rem;
+  }
+
+  /* 5 Lugares Zynga em Horizontal */
   .seat {
-    width: 78px;
+    width: 76px;
   }
 
-  .seat-0 { left: 26%; top: 98%; }
-  .seat-1 { left: -5%; top: 52%; }
-  .seat-2 { left: 18%; top: -4%; }
-  .seat-3 { left: 82%; top: -4%; }
-  .seat-4 { left: 105%; top: 52%; }
-  .seat-5 { left: 68%; top: 98%; }
+  .seat-0 { left: 50%; top: 100%; }
+  .seat-1 { left: 2%;  top: 74%;  }
+  .seat-2 { left: 19%; top: -4%;  }
+  .seat-3 { left: 81%; top: -4%;  }
+  .seat-4 { left: 98%; top: 74%;  }
 
-  .seat-0 .seat-bet-zone,
-  .seat-5 .seat-bet-zone {
-    bottom: 118%;
-  }
-
-  .seat-2 .seat-bet-zone,
-  .seat-3 .seat-bet-zone {
-    top: 104%;
-  }
-
-  .seat-1 .seat-bet-zone {
-    left: 104%;
-  }
-
-  .seat-4 .seat-bet-zone {
-    right: 104%;
-  }
+  /* 6 Lugares em Horizontal */
+  .poker-table.six-players .seat-0 { left: 32%; top: 100%; }
+  .poker-table.six-players .seat-1 { left: -3%; top: 52%;  }
+  .poker-table.six-players .seat-2 { left: 19%; top: -4%;  }
+  .poker-table.six-players .seat-3 { left: 81%; top: -4%;  }
+  .poker-table.six-players .seat-4 { left: 103%; top: 52%; }
+  .poker-table.six-players .seat-5 { left: 68%; top: 100%; }
 
   .seat-ring {
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     padding: 2.5px;
+  }
+
+  .seat.is-me .seat-ring {
+    width: 56px;
+    height: 56px;
+  }
+
+  .seat.empty .seat-ring {
+    width: 40px;
+    height: 40px;
+  }
+
+  .seat-empty-label {
+    font-size: 0.56rem;
+  }
+
+  .seat.is-me.has-cards .seat-circle {
+    padding-top: 5px;
+  }
+
+  .seat.is-me.has-cards .seat-chips {
+    margin-top: 23px;
+  }
+
+  .seat-0 .hero-bet-zone {
+    bottom: calc(100% + 9px);
+  }
+
+  .seat-felt-zone {
+    gap: 4px;
+  }
+
+  .seat-1 .seat-felt-zone {
+    left: 92%;
+    top: 20%;
+  }
+
+  .seat-2 .seat-felt-zone,
+  .seat-3 .seat-felt-zone {
+    top: 108%;
+  }
+
+  .seat-4 .seat-felt-zone {
+    right: 92%;
+    top: 20%;
   }
 
   .seat.active-turn .seat-ring,
@@ -1812,49 +1973,49 @@ body.is-fullscreen #game-screen #btn-leave {
   }
 
   .seat-name {
-    font-size: 0.64rem;
+    font-size: 0.62rem;
   }
 
   .seat-you-tag {
-    font-size: 0.48rem;
+    font-size: 0.44rem;
     margin-top: 1px;
   }
 
   .winner-badge {
-    bottom: -5px;
-    font-size: 0.54rem;
+    top: -8px;
+    font-size: 0.5rem;
     padding: 1px 6px;
   }
 
   .seat-chips {
-    margin-top: 4px;
-    font-size: 0.64rem;
+    margin-top: 3px;
+    font-size: 0.62rem;
     padding: 1px 7px;
   }
 
   .seat-status {
     margin-top: 1px;
-    font-size: 0.52rem;
+    font-size: 0.5rem;
     padding: 1px 5px;
   }
 
   .dealer-chip {
-    width: 18px;
-    height: 18px;
-    font-size: 0.6rem;
+    width: 17px;
+    height: 17px;
+    font-size: 0.56rem;
     top: -3px;
     right: -3px;
   }
 
   .turn-timer-text {
-    font-size: 0.56rem;
+    font-size: 0.54rem;
     padding: 0 4px;
     top: -4px;
     left: -4px;
   }
 
   .bet-pill {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     padding: 1px 6px 1px 4px;
     gap: 3px;
   }
@@ -1864,7 +2025,7 @@ body.is-fullscreen #game-screen #btn-leave {
     height: 8px;
   }
 
-  /* HUD compacto no canto inferior direito (e força da mão no canto inferior esquerdo) */
+  /* HUD compacto no canto inferior direito */
   .controls-hud {
     padding:
       0
@@ -1874,68 +2035,79 @@ body.is-fullscreen #game-screen #btn-leave {
   }
 
   .hand-strength {
-    font-size: 0.68rem;
-    padding: 0.22rem 0.68rem;
+    font-size: 0.66rem;
+    padding: 0.2rem 0.64rem;
   }
 
   .action-dock {
-    padding: 0.34rem 0.44rem;
-    gap: 0.32rem;
-    border-radius: 13px;
+    padding: 0.3rem 0.4rem;
+    gap: 0.28rem;
+    border-radius: 12px;
   }
 
   .raise-row {
-    gap: 0.35rem;
+    gap: 0.32rem;
   }
 
   .btn-quick {
-    padding: 0.16rem 0.42rem;
-    font-size: 0.64rem;
+    padding: 0.14rem 0.38rem;
+    font-size: 0.62rem;
     border-radius: 6px;
   }
 
   #raise-slider {
-    min-width: 90px;
-    height: 20px;
+    min-width: 82px;
+    height: 18px;
   }
 
   .main-action-row {
-    gap: 0.32rem;
+    gap: 0.28rem;
   }
 
   .main-action-row .btn {
-    min-height: 36px;
-    padding: 0.38rem 0.62rem;
-    font-size: 0.76rem;
-    border-radius: 9px;
+    min-height: 34px;
+    padding: 0.34rem 0.56rem;
+    font-size: 0.74rem;
+    border-radius: 8px;
   }
 
-  .btn-fold { min-width: 58px; }
-  .btn-call { min-width: 82px; }
-  .btn-raise { min-width: 88px; }
-  .btn-allin { min-width: 60px; }
+  .btn-fold { min-width: 54px; }
+  .btn-call { min-width: 78px; }
+  .btn-raise { min-width: 82px; }
+  .btn-allin { min-width: 56px; }
 }
 
 /* Ajuste fino extra para ecrãs Android muito baixos (<= 365px altura) */
 @media (orientation: landscape) and (max-height: 365px) {
   body.is-fullscreen .table-area {
-    padding-top: 36px;
-    padding-bottom: 76px;
+    padding-top: 30px;
+    padding-bottom: 74px;
   }
   body.is-fullscreen .poker-table {
-    height: 55dvh;
+    height: 49dvh;
   }
   .dealer-avatar-wrap {
+    width: 40px;
+    height: 40px;
+  }
+  .seat-ring {
     width: 42px;
     height: 42px;
   }
-  .seat-ring {
-    width: 44px;
-    height: 44px;
+  .seat.is-me .seat-ring {
+    width: 50px;
+    height: 50px;
+  }
+  .hero-cards .card {
+    width: 34px;
+    height: 46px;
+  }
+  .seat.is-me.has-cards .seat-chips {
+    margin-top: 19px;
   }
   .main-action-row .btn {
-    min-height: 32px;
-    padding: 0.3rem 0.52rem;
-    font-size: 0.72rem;
+    min-height: 30px;
+    padding: 0.28rem 0.48rem;
+    font-size: 0.7rem;
   }
 }
