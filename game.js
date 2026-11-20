@@ -14,7 +14,7 @@ const firebaseConfig = {
 let db = null;
 const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey &&
-  firebaseConfig.apiKey !== "SUA_API_KEY" &&
+  firebaseConfig.apiKey !== AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk" &&
   firebaseConfig.databaseURL
 );
 
