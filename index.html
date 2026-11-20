@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>HIPERBLUFF — Poker Multiplayer</title>
-  <link rel="stylesheet" href="style.css?v=17" />
-  <link rel="stylesheet" href="menus.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="menus.css?v=18" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#071321" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -115,16 +115,16 @@
       <div class="hub-cards-grid">
         <!-- CARD 1: ONLINE -->
         <div id="card-play-online" class="mode-card card-online">
-          <div class="card-ribbon">MULTIPLAYER • ATÉ 6 JOGADORES</div>
+          <div class="card-ribbon">3 MESAS PERMANENTES • ATÉ 6 JOGADORES</div>
           <div class="card-body">
             <div class="card-fan-art" aria-hidden="true">
               <div class="mini-art-card">A♠</div>
               <div class="mini-art-card red">K♥</div>
             </div>
             <h2>JOGAR ONLINE</h2>
-            <p>Cria uma sala privada ou entra com código para jogar com amigos.</p>
+            <p>Escolhe uma das 3 mesas vitalícias (5 000 €, 10 000 € ou 50 000 €) e entra já.</p>
           </div>
-          <button id="btn-open-online" class="card-cta" type="button">Escolher Sala</button>
+          <button id="btn-open-online" class="card-cta" type="button">Escolher Mesa</button>
         </div>
 
         <!-- CARD 2: BOTS -->
@@ -231,8 +231,7 @@
         <span id="display-phase" class="badge">AGUARDAR</span>
       </div>
       <div class="top-center">
-        <span>Sala: <strong id="display-room-code">----</strong></span>
-        <button id="btn-copy-code" class="btn-tiny" title="Copiar código">Copiar</button>
+        <span>Mesa: <strong id="display-room-code">----</strong></span>
       </div>
       <div class="top-right">
         <button id="btn-fullscreen" class="btn btn-icon" title="Ecrã inteiro">⛶</button>
@@ -291,10 +290,6 @@
             <div id="next-hand-countdown" class="next-hand-pill hidden">5s</div>
           </div>
           <div id="table-message" class="dealer-speech">À espera de jogadores...</div>
-          <div id="waiting-room-pill" class="waiting-room-pill hidden">
-            <span>Sala: <strong id="waiting-room-code">----</strong></span>
-            <button id="btn-waiting-copy" class="btn-tiny">Copiar</button>
-          </div>
         </div>
 
         <div class="table-center">
@@ -322,7 +317,7 @@
       <div class="hud-bottom-left">
         <div class="table-quick-actions">
           <button id="btn-start-game" class="btn btn-primary btn-sm hidden">Começar Já</button>
-          <button id="btn-rebuy" class="btn btn-rebuy btn-sm hidden">+ Rebuy 1000€</button>
+          <button id="btn-rebuy" class="btn btn-rebuy btn-sm hidden">+ Rebuy</button>
           <button id="btn-new-match" class="btn btn-primary btn-sm hidden">Nova Partida</button>
         </div>
         <div id="hand-strength-badge" class="hand-strength">A tua mão: —</div>
@@ -347,28 +342,73 @@
     </footer>
   </div>
 
-  <!-- MODAL SALA ONLINE (CRIAR / ENTRAR COM CÓDIGO) -->
+  <!-- MODAL MESAS ONLINE PERMANENTES (3 CARDS) -->
   <div id="online-modal" class="modal-backdrop hidden">
     <div class="modal-box online-modal-box">
       <div class="modal-head">
-        <h3>♠ Jogar Online</h3>
+        <h3>♠ Mesas Online Permanentes</h3>
         <button id="btn-close-online-modal" class="btn-tiny" type="button">✕ Fechar</button>
       </div>
-      <div class="online-options-grid">
-        <div class="online-box-col">
-          <h4>Criar Nova Sala</h4>
-          <p>Gera um código de 5 letras para partilhares com os teus amigos.</p>
-          <button id="btn-create-room" class="btn btn-primary" type="button">Criar Sala Online</button>
-        </div>
-        <div class="online-box-col">
-          <h4>Entrar numa Sala</h4>
-          <p>Introduz o código da mesa do anfitrião para te sentares.</p>
-          <div class="join-row">
-            <input type="text" id="room-code" maxlength="6" placeholder="CÓDIGO" />
-            <button id="btn-join-room" class="btn btn-secondary" type="button">Entrar</button>
+
+      <div class="permanent-rooms-grid">
+        <!-- MESA 1: 5 000 € -->
+        <div id="room-card-MESA_1" class="room-card room-ice" role="button" tabindex="0">
+          <div class="room-card-top">
+            <span class="room-tier">MESA 1 • INICIANTE</span>
+            <span id="occ-MESA_1" class="room-occupancy"><span class="occ-dot"></span>0/6</span>
           </div>
+          <div class="room-card-body">
+            <div class="room-icon" aria-hidden="true">❄</div>
+            <h4>MESA GELO</h4>
+            <div class="room-buyin-box">
+              <span class="room-buyin-label">BUY-IN</span>
+              <span class="room-buyin-value">5 000 €</span>
+            </div>
+            <div class="room-blinds-pill">Blinds 50 € / 100 €</div>
+            <span id="status-MESA_1" class="room-status-text">Mesa livre</span>
+          </div>
+          <button id="btn-enter-MESA_1" class="room-cta" type="button">Entrar na Mesa</button>
+        </div>
+
+        <!-- MESA 2: 10 000 € -->
+        <div id="room-card-MESA_2" class="room-card room-gold" role="button" tabindex="0">
+          <div class="room-card-top">
+            <span class="room-tier">MESA 2 • INTERMÉDIO</span>
+            <span id="occ-MESA_2" class="room-occupancy"><span class="occ-dot"></span>0/6</span>
+          </div>
+          <div class="room-card-body">
+            <div class="room-icon" aria-hidden="true">🪙</div>
+            <h4>MESA OURO</h4>
+            <div class="room-buyin-box">
+              <span class="room-buyin-label">BUY-IN</span>
+              <span class="room-buyin-value">10 000 €</span>
+            </div>
+            <div class="room-blinds-pill">Blinds 100 € / 200 €</div>
+            <span id="status-MESA_2" class="room-status-text">Mesa livre</span>
+          </div>
+          <button id="btn-enter-MESA_2" class="room-cta" type="button">Entrar na Mesa</button>
+        </div>
+
+        <!-- MESA 3: 50 000 € -->
+        <div id="room-card-MESA_3" class="room-card room-vip" role="button" tabindex="0">
+          <div class="room-card-top">
+            <span class="room-tier">MESA 3 • HIGH ROLLER</span>
+            <span id="occ-MESA_3" class="room-occupancy"><span class="occ-dot"></span>0/6</span>
+          </div>
+          <div class="room-card-body">
+            <div class="room-icon" aria-hidden="true">💎</div>
+            <h4>MESA VIP</h4>
+            <div class="room-buyin-box">
+              <span class="room-buyin-label">BUY-IN</span>
+              <span class="room-buyin-value">50 000 €</span>
+            </div>
+            <div class="room-blinds-pill">Blinds 500 € / 1 000 €</div>
+            <span id="status-MESA_3" class="room-status-text">Mesa livre</span>
+          </div>
+          <button id="btn-enter-MESA_3" class="room-cta" type="button">Entrar na Mesa</button>
         </div>
       </div>
+
       <p id="lobby-error" class="error-msg"></p>
     </div>
   </div>
