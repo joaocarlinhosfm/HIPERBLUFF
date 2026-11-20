@@ -5,8 +5,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { SoundEngine } from "./audio.js";
 import {
-  MAX_PLAYERS, STARTING_CHIPS, BIG_BLIND, TURN_DURATION_MS, AUTO_START_DELAY_MS, LED_THEMES,
-  cardKey, secureRandomInt, generateRoomCode, evaluateBestHand, buildSidePots,
+  MAX_PLAYERS, STARTING_CHIPS, SMALL_BLIND, BIG_BLIND,
+  TURN_DURATION_MS, AUTO_START_DELAY_MS, LED_THEMES,
+  PERMANENT_ROOMS, getPermanentRoomConfig, createPermanentRoomState,
+  cardKey, secureRandomInt, evaluateBestHand, buildSidePots,
   normalizeRoomState, createInitialRoom, setSoundEvent,
   buildNewHandState, advancePhaseOnState, applyActionToState, removePlayerFromState
 } from "./poker.js";
@@ -49,45 +51,6 @@ function getOrCreatePlayerId() {
     return saved;
   } catch (_) {
     return "p_" + Math.random().toString(36).slice(2, 10);
-  }
-}
-
-function extractRoomCode(rawInput) {
-  const text = String(rawInput || "").trim();
-  if (!text) return "";
-  const match = text.match(/[?&]room=([a-z0-9]+)/i);
-  const candidate = match ? match[1] : text;
-  return candidate.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
-}
-
-function getInviteCodeFromURL() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return extractRoomCode(params.get("room") || "");
-  } catch (_) {
-    return "";
-  }
-}
-
-function clearInviteFromURL() {
-  try {
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("room")) {
-      url.searchParams.delete("room");
-      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-    }
-  } catch (_) {}
-}
-
-function buildInviteLink(code) {
-  try {
-    const url = new URL(window.location.href);
-    url.search = "";
-    url.hash = "";
-    url.searchParams.set("room", code);
-    return url.toString();
-  } catch (_) {
-    return code;
   }
 }
 
@@ -149,7 +112,7 @@ function applyTableLedTheme(index) {
 }
 
 /* ============================================================================
-   2. ESTADO LOCAL, PRESENÇA ONLINE, TIMERS E BOTS
+   2. MESAS VITALÍCIAS, PRESENÇA ONLINE, TIMERS E BOTS
    ============================================================================ */
 let localMode = true;
 const myId = getOrCreatePlayerId();
@@ -162,13 +125,17 @@ let unsubscribeConnected = null;
 let myPresenceRef = null;
 let myOnDisconnectHandle = null;
 
+const permanentLobbyUnsubs = [];
+const permanentLobbySnapshots = {};
+
 let isSyncingAction = false;
 let isLeavingRoom = false;
+let isJoiningRoom = false;
 let wasSeatedInRoom = false;
 let isMigratingHost = false;
 let isCleaningDisconnected = false;
-let pendingInviteCode = getInviteCodeFromURL();
 let hasHandledInitialAutoEntry = false;
+let permanentRoomsSeeded = false;
 
 const offlineSinceMap = new Map();
 
@@ -187,6 +154,16 @@ function isPlayerOffline(playerId) {
   if (localMode || !playerId || playerId === myId) return false;
   const entry = roomPresence?.[playerId];
   return Boolean(entry && entry.online === false);
+}
+
+function isRoomAbandoned(state, presence) {
+  if (!state || !state.players || state.players.length === 0) return false;
+  const now = Date.now();
+  return state.players.every(p => {
+    const pres = presence?.[p.id];
+    if (!pres || pres.online !== false) return false;
+    return !pres.at || (now - Number(pres.at)) >= DISCONNECT_REMOVE_GRACE_MS;
+  });
 }
 
 function updateOfflineTrackers() {
@@ -220,6 +197,106 @@ function pickPreferredOnlineHost(players, presence, excludeId = "") {
   if (online) return online.id;
   const notOffline = candidates.find(p => presence?.[p.id]?.online !== false);
   return (notOffline || candidates[0])?.id || "";
+}
+
+async function ensurePermanentRooms() {
+  if (!isFirebaseConfigured || !db) return;
+  await Promise.all(PERMANENT_ROOMS.map(async (cfg) => {
+    const rRef = ref(db, `rooms/${cfg.id}`);
+    try {
+      const snap = await withTimeout(get(rRef));
+      const val = snap.exists() ? snap.val() : null;
+      if (val && val.permanent === true && Number(val.buyIn) === cfg.buyIn && Number(val.bigBlind) === cfg.bigBlind) {
+        return;
+      }
+      await runTransaction(rRef, (raw) => {
+        if (!raw) return createPermanentRoomState(cfg);
+        const prevPresence = raw.presence || null;
+        const normalized = normalizeRoomState(raw);
+        normalized.roomId = cfg.id;
+        normalized.roomName = cfg.name;
+        normalized.permanent = true;
+        normalized.buyIn = cfg.buyIn;
+        normalized.smallBlind = cfg.smallBlind;
+        normalized.bigBlind = cfg.bigBlind;
+        normalized.tableLedIndex = cfg.ledIndex;
+        if (prevPresence) normalized.presence = prevPresence;
+        return normalized;
+      });
+    } catch (err) {
+      console.error(`Erro ao garantir mesa vitalícia ${cfg.id}:`, err);
+    }
+  }));
+  permanentRoomsSeeded = true;
+}
+
+function renderPermanentRoomCards() {
+  const user = getCurrentUser();
+  const balance = user ? user.balance : 0;
+
+  for (const cfg of PERMANENT_ROOMS) {
+    const raw = permanentLobbySnapshots[cfg.id];
+    const state = raw ? normalizeRoomState(raw) : null;
+    const presence = raw?.presence || {};
+    const abandoned = state ? isRoomAbandoned(state, presence) : false;
+    const seatedPlayers = (state && !abandoned) ? state.players : [];
+    const count = seatedPlayers.length;
+    const isAlreadySeated = seatedPlayers.some(p => p.id === myId);
+    const isFull = count >= MAX_PLAYERS && !isAlreadySeated;
+    const hasEnoughBalance = isAlreadySeated || balance >= cfg.minEntry;
+    const inGame = state && !abandoned && state.phase !== "WAITING" && count >= 2;
+
+    const occEl = $(`occ-${cfg.id}`);
+    if (occEl) {
+      const dotClass = isFull ? "full" : count > 0 ? "live" : "";
+      occEl.innerHTML = `<span class="occ-dot ${dotClass}"></span>${count}/${MAX_PLAYERS}`;
+    }
+
+    const statusEl = $(`status-${cfg.id}`);
+    if (statusEl) {
+      if (!raw) statusEl.textContent = "Disponível • Vitalícia";
+      else if (isAlreadySeated) statusEl.textContent = "Já estás sentado";
+      else if (isFull) statusEl.textContent = "Mesa cheia (6/6)";
+      else if (!hasEnoughBalance) statusEl.textContent = `Mínimo: ${formatEuro(cfg.minEntry)}`;
+      else if (inGame) statusEl.textContent = "Partida a decorrer";
+      else if (count === 1) statusEl.textContent = "1 jogador à espera";
+      else statusEl.textContent = "Mesa livre";
+    }
+
+    const cardEl = $(`room-card-${cfg.id}`);
+    const btnEl = $(`btn-enter-${cfg.id}`);
+    const blocked = isFull || !hasEnoughBalance;
+
+    cardEl?.classList.toggle("room-disabled", blocked);
+    if (btnEl) {
+      btnEl.disabled = blocked || isJoiningRoom;
+      if (isAlreadySeated) btnEl.textContent = "Voltar à Mesa";
+      else if (isFull) btnEl.textContent = "Mesa Cheia";
+      else if (!hasEnoughBalance) btnEl.textContent = "Saldo Insuficiente";
+      else btnEl.textContent = "Entrar na Mesa";
+    }
+  }
+}
+
+function unsubscribePermanentRoomsLobby() {
+  while (permanentLobbyUnsubs.length > 0) {
+    const unsub = permanentLobbyUnsubs.pop();
+    try { unsub(); } catch (_) {}
+  }
+}
+
+function subscribePermanentRoomsLobby() {
+  unsubscribePermanentRoomsLobby();
+  if (!isFirebaseConfigured || !db) return;
+
+  for (const cfg of PERMANENT_ROOMS) {
+    const unsub = onValue(ref(db, `rooms/${cfg.id}`), (snap) => {
+      permanentLobbySnapshots[cfg.id] = snap.exists() ? snap.val() : createPermanentRoomState(cfg);
+      renderPermanentRoomCards();
+    });
+    permanentLobbyUnsubs.push(unsub);
+  }
+  renderPermanentRoomCards();
 }
 
 function detachPresence(removeNode = false) {
@@ -283,9 +360,10 @@ async function claimHostViaTransaction(code) {
 
 async function removePlayerFromRoomTx(code, targetPlayerId, reason = "saiu da mesa", onlyIfOffline = false) {
   if (!db || !code || !targetPlayerId) return;
+  const permCfg = getPermanentRoomConfig(code);
   try {
     await runTransaction(ref(db, `rooms/${code}`), (raw) => {
-      if (!raw) return raw;
+      if (!raw) return permCfg ? createPermanentRoomState(permCfg) : raw;
       const prevPresence = { ...(raw.presence || {}) };
       if (onlyIfOffline && prevPresence[targetPlayerId]?.online === true) return undefined;
 
@@ -303,9 +381,18 @@ async function removePlayerFromRoomTx(code, targetPlayerId, reason = "saiu da me
       const next = removePlayerFromState(state, targetPlayerId, reason, preferredHost);
       if (!next) return undefined;
 
-      if (next.players.length === 0) return null;
-
       delete prevPresence[targetPlayerId];
+
+      // Mesas vitalícias NUNCA são apagadas da base de dados — ficam vazias em WAITING
+      if (next.players.length === 0) {
+        if (next.permanent || permCfg) {
+          next.permanent = true;
+          next.presence = null;
+          return next;
+        }
+        return null;
+      }
+
       next.presence = Object.keys(prevPresence).length ? prevPresence : null;
       return next;
     });
@@ -399,10 +486,11 @@ function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
 function startNewMatchReset() {
   if (!roomState || roomState.hostId !== myId) return;
   const user = getCurrentUser();
-  const myStack = user ? Math.min(STARTING_CHIPS, user.balance) : STARTING_CHIPS;
+  const tableBuyIn = Number(roomState.buyIn) || STARTING_CHIPS;
+  const myStack = user ? Math.min(tableBuyIn, user.balance) : tableBuyIn;
   const s = normalizeRoomState(structuredClone(roomState));
   s.players.forEach(p => {
-    const stack = p.id === myId ? myStack : STARTING_CHIPS;
+    const stack = p.id === myId ? myStack : tableBuyIn;
     p.chips = stack; p.handStartChips = stack; p.bet = 0; p.totalBet = 0;
     p.folded = false; p.allIn = false; p.acted = false; p.participated = false; p.status = "PRONTO";
   });
@@ -415,9 +503,11 @@ async function performRebuy() {
   const myIdx = roomState.players.findIndex(p => p.id === myId);
   if (myIdx < 0 || roomState.players[myIdx].chips > 0) return;
 
+  const tableBuyIn = Number(roomState.buyIn) || STARTING_CHIPS;
+  const tableBB = Number(roomState.bigBlind) || BIG_BLIND;
   const user = getCurrentUser();
-  const rebuyAmount = user ? Math.min(STARTING_CHIPS, user.balance) : STARTING_CHIPS;
-  if (rebuyAmount < BIG_BLIND) return;
+  const rebuyAmount = user ? Math.min(tableBuyIn, user.balance) : tableBuyIn;
+  if (rebuyAmount < tableBB) return;
 
   if (localMode) {
     const inActiveHand = roomState.phase !== "WAITING" && roomState.phase !== "SHOWDOWN";
@@ -432,7 +522,7 @@ async function performRebuy() {
       const alive = s.players.filter(pl => pl.chips > 0).length;
       if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
         s.nextHandDeadline = Date.now() + 3000;
-        s.message = `${meName} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
+        s.message = `${meName} fez Rebuy (+${rebuyAmount.toLocaleString("pt-PT")}€)! Nova mão a começar...`;
       }
     }
     setSoundEvent(s, "chip");
@@ -455,7 +545,7 @@ async function performRebuy() {
           const alive = s.players.filter(pl => pl.chips > 0).length;
           if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
             s.nextHandDeadline = Date.now() + 3000;
-            s.message = `${s.players[idx].name} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
+            s.message = `${s.players[idx].name} fez Rebuy (+${rebuyAmount.toLocaleString("pt-PT")}€)! Nova mão a começar...`;
           }
         }
         setSoundEvent(s, "chip");
@@ -478,15 +568,16 @@ function maybeTriggerBotTurn() {
     if (!roomState || roomState.isRunout || roomState.turnIndex < 0) return;
     const p = roomState.players[roomState.turnIndex];
     if (!p || !p.isBot) return;
+    const bb = Number(roomState.bigBlind) || BIG_BLIND;
     const toCall = roomState.currentBet - p.bet;
     const roll = secureRandomInt(100);
     if (toCall === 0) {
       if (roll < 75) handleAction(p.id, "check-call");
-      else handleAction(p.id, "raise", roomState.currentBet + BIG_BLIND * 2);
+      else handleAction(p.id, "raise", roomState.currentBet + bb * 2);
     } else {
-      if (roll < 25 && toCall > BIG_BLIND * 2) handleAction(p.id, "fold");
+      if (roll < 25 && toCall > bb * 2) handleAction(p.id, "fold");
       else if (roll < 85) handleAction(p.id, "check-call");
-      else handleAction(p.id, "raise", roomState.currentBet + BIG_BLIND * 2);
+      else handleAction(p.id, "raise", roomState.currentBet + bb * 2);
     }
   }, 900 + secureRandomInt(900));
 }
@@ -624,30 +715,30 @@ function renderGame() {
   const isShowdown = roomState.phase === "SHOWDOWN", isWaiting = roomState.phase === "WAITING";
   const winCardsSet = new Set(roomState.winningCards || []), winnerIdsSet = new Set(roomState.winnerIds || []);
   const hasCardHighlights = isShowdown && winCardsSet.size > 0;
+  const tableBuyIn = Number(roomState.buyIn) || STARTING_CHIPS;
+  const tableSB = Number(roomState.smallBlind) || SMALL_BLIND;
+  const tableBB = Number(roomState.bigBlind) || BIG_BLIND;
 
   const tableEl = document.querySelector(".poker-table");
   const visibleSeats = players.length > 5 ? 6 : 5;
   tableEl?.classList.toggle("six-players", visibleSeats === 6);
 
-  if ($("display-room-code")) $("display-room-code").textContent = currentRoomCode || "DEMO";
+  const tableTitle = roomState.roomName
+    ? `${roomState.roomName} • ${tableSB}/${tableBB}€`
+    : `${currentRoomCode || "OFFLINE"} • ${tableSB}/${tableBB}€`;
+
+  if ($("display-room-code")) $("display-room-code").textContent = tableTitle;
   if ($("display-phase")) $("display-phase").textContent = isWaiting ? "A AGUARDAR" : roomState.phase;
-  if ($("pot-amount")) $("pot-amount").textContent = roomState.pot;
+  if ($("pot-amount")) $("pot-amount").textContent = roomState.pot.toLocaleString("pt-PT");
   if ($("pot-chips")) $("pot-chips").innerHTML = renderPotChipsHTML(roomState.pot);
   if ($("table-message")) $("table-message").textContent = roomState.message;
-
-  const waitingPill = $("waiting-room-pill");
-  if (waitingPill) {
-    const showCode = isWaiting && !localMode && Boolean(currentRoomCode);
-    waitingPill.classList.toggle("hidden", !showCode);
-    if (showCode && $("waiting-room-code")) $("waiting-room-code").textContent = currentRoomCode;
-  }
 
   const sidePotsEl = $("side-pots-display");
   if (sidePotsEl) {
     const hasAllIn = players.some(p => !p.folded && p.allIn);
     const sp = hasAllIn ? buildSidePots(players, roomState.deadPot) : [];
     if (hasAllIn && sp.length > 1 && !isWaiting) {
-      sidePotsEl.innerHTML = sp.map((x, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${x.amount}€</span>`).join("");
+      sidePotsEl.innerHTML = sp.map((x, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${x.amount.toLocaleString("pt-PT")}€</span>`).join("");
       sidePotsEl.classList.remove("hidden");
     } else sidePotsEl.classList.add("hidden");
   }
@@ -657,7 +748,7 @@ function renderGame() {
     $("btn-start-game").classList.toggle("hidden", !(isHost && funded >= 2 && (isWaiting || isShowdown)));
     $("btn-start-game").textContent = isShowdown ? "Saltar Espera" : "Começar Já";
   }
-  $("btn-new-match")?.classList.toggle("hidden", !(isHost && isShowdown && funded < 2));
+  $("btn-new-match")?.classList.toggle("hidden", !(localMode && isHost && isShowdown && funded < 2));
 
   if ($("community-cards")) {
     $("community-cards").innerHTML = community.map(c =>
@@ -693,7 +784,7 @@ function renderGame() {
     const statusLabel = isPlayerOffline(p.id) ? "OFFLINE..." : p.status;
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${inHand ? "has-cards" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
-    const betPill = p.bet > 0 ? `<div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div>` : "";
+    const betPill = p.bet > 0 ? `<div class="bet-pill"><span class="mini-chip"></span>${p.bet.toLocaleString("pt-PT")} €</div>` : "";
     const ringInner = `
       ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
       ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
@@ -704,17 +795,25 @@ function renderGame() {
       const heroCards = inHand ? `<div class="hero-cards">${p.hand.map(c =>
         renderCardHTML(c, false, false, hasCardHighlights ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
       ).join("")}</div>` : "";
-      el.innerHTML = `<div class="seat-avatar-stack">${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}<div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>${heroCards}</div><div class="seat-chips">${p.chips} €</div>${statusLabel ? `<div class="seat-status">${statusLabel}</div>` : ""}`;
+      el.innerHTML = `<div class="seat-avatar-stack">${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}<div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>${heroCards}</div><div class="seat-chips">${p.chips.toLocaleString("pt-PT")} €</div>${statusLabel ? `<div class="seat-status">${statusLabel}</div>` : ""}`;
     } else {
       const oppCards = inHand ? `<div class="opp-cards ${showCards ? "revealed" : ""}">${p.hand.map(c =>
         renderCardHTML(c, !showCards, !showCards, (hasCardHighlights && showCards) ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
       ).join("")}</div>` : "";
-      el.innerHTML = `${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}<div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div><div class="seat-chips">${p.chips} €</div>${statusLabel ? `<div class="seat-status">${statusLabel}</div>` : ""}`;
+      el.innerHTML = `${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}<div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div><div class="seat-chips">${p.chips.toLocaleString("pt-PT")} €</div>${statusLabel ? `<div class="seat-status">${statusLabel}</div>` : ""}`;
     }
   }
 
   const me = players[myIndex], user = getCurrentUser();
-  $("btn-rebuy")?.classList.toggle("hidden", !Boolean(me && me.chips === 0 && (!user || user.balance >= BIG_BLIND) && (me.folded || isShowdown || isWaiting)));
+  const rebuyBtn = $("btn-rebuy");
+  const canRebuy = Boolean(me && me.chips === 0 && (!user || user.balance >= tableBB) && (me.folded || isShowdown || isWaiting));
+  if (rebuyBtn) {
+    rebuyBtn.classList.toggle("hidden", !canRebuy);
+    if (canRebuy) {
+      const rebuyAmt = user ? Math.min(tableBuyIn, user.balance) : tableBuyIn;
+      rebuyBtn.textContent = `+ Rebuy ${rebuyAmt.toLocaleString("pt-PT")} €`;
+    }
+  }
 
   if ($("hand-strength-badge")) {
     if (me && !me.folded && me.hand?.length === 2) {
@@ -730,7 +829,11 @@ function renderGame() {
 
   if (isMyTurn) {
     const toCall = Math.max(0, roomState.currentBet - me.bet), callAmt = Math.min(toCall, me.chips);
-    if ($("btn-check-call")) $("btn-check-call").textContent = toCall === 0 ? "Check" : (callAmt >= me.chips ? `Call All-In (${callAmt}€)` : `Call ${callAmt}€`);
+    if ($("btn-check-call")) {
+      $("btn-check-call").textContent = toCall === 0
+        ? "Check"
+        : (callAmt >= me.chips ? `Call All-In (${callAmt.toLocaleString("pt-PT")}€)` : `Call ${callAmt.toLocaleString("pt-PT")}€`);
+    }
     const maxR = me.bet + me.chips, canR = me.chips > toCall, minR = Math.min(maxR, roomState.currentBet + roomState.minRaise);
     const slider = $("raise-slider");
     if (slider) slider.disabled = !canR;
@@ -740,9 +843,10 @@ function renderGame() {
     const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
     if (slider && lastSliderTurnKey !== turnKey) {
       lastSliderTurnKey = turnKey;
-      slider.step = (maxR - minR) % 10 === 0 ? 10 : 1;
+      const baseStep = Math.max(10, tableSB);
+      slider.step = (maxR - minR) % baseStep === 0 ? baseStep : ((maxR - minR) % 10 === 0 ? 10 : 1);
       slider.min = minR; slider.max = maxR; slider.value = minR;
-      if ($("raise-value")) $("raise-value").textContent = minR;
+      if ($("raise-value")) $("raise-value").textContent = minR.toLocaleString("pt-PT");
     }
   }
 
@@ -751,11 +855,16 @@ function renderGame() {
 }
 
 /* ============================================================================
-   4. AUTENTICAÇÃO, HUB DE CARDS, PERFIL E SALAS ONLINE
+   4. AUTENTICAÇÃO, HUB DE CARDS, PERFIL E MESAS PERMANENTES
    ============================================================================ */
+function closeOnlineModal() {
+  $("online-modal")?.classList.add("hidden");
+  unsubscribePermanentRoomsLobby();
+}
+
 function openGameScreen() {
   trackedHandId = 0; handSettled = false;
-  $("online-modal")?.classList.add("hidden");
+  closeOnlineModal();
   showScreen("game-screen");
   startTimerLoop();
 }
@@ -765,11 +874,14 @@ function showError(msg) {
   if ($("hub-error")) $("hub-error").textContent = msg;
 }
 
-function getLoggedBuyInOrError() {
+function getLoggedBuyInOrError(buyInCap = STARTING_CHIPS, minRequired = BIG_BLIND) {
   const user = getCurrentUser();
   if (!user) { showError("Inicia sessão primeiro."); return null; }
-  if (user.balance < BIG_BLIND) { showError(`Saldo insuficiente (${formatEuro(user.balance)}).`); return null; }
-  return { name: user.username, buyIn: Math.min(STARTING_CHIPS, user.balance) };
+  if (user.balance < minRequired) {
+    showError(`Saldo insuficiente. Precisas de pelo menos ${formatEuro(minRequired)}.`);
+    return null;
+  }
+  return { name: user.username, buyIn: Math.min(buyInCap, user.balance) };
 }
 
 function resetLocalRoomSession(notice = "") {
@@ -801,18 +913,10 @@ function setAuthMode(mode) {
 
 async function handlePostAuthAutoEntry(user) {
   if (!isFirebaseConfigured || !db || !user) return;
-
-  if (pendingInviteCode) {
-    const invite = pendingInviteCode;
-    pendingInviteCode = "";
-    clearInviteFromURL();
-    if ($("room-code")) $("room-code").value = invite;
-    await joinOnlineRoom(invite, true);
-    return;
-  }
+  if (!permanentRoomsSeeded) await ensurePermanentRooms();
 
   const saved = getSavedActiveRoomSession();
-  if (saved?.code && (!saved.userKey || saved.userKey === user.key)) {
+  if (saved?.code && getPermanentRoomConfig(saved.code) && (!saved.userKey || saved.userKey === user.key)) {
     await attemptReconnectToRoom(saved.code);
   }
 }
@@ -820,7 +924,7 @@ async function handlePostAuthAutoEntry(user) {
 function renderAuthUI(user) {
   if (!user) {
     hasHandledInitialAutoEntry = false;
-    $("online-modal")?.classList.add("hidden");
+    closeOnlineModal();
     showScreen("auth-screen");
     return;
   }
@@ -867,6 +971,10 @@ function renderAuthUI(user) {
   if ($("stat-biggest-win")) $("stat-biggest-win").textContent = formatEuro(user.biggestWin);
   if ($("stat-best-streak")) $("stat-best-streak").textContent = `Melhor série: ${user.bestStreak}`;
 
+  if (!$("online-modal")?.classList.contains("hidden")) {
+    renderPermanentRoomCards();
+  }
+
   if (getActiveScreenId() === "auth-screen") showScreen("hub-screen");
 
   if (!hasHandledInitialAutoEntry && getActiveScreenId() !== "game-screen") {
@@ -902,25 +1010,28 @@ on("btn-logout", "click", () => {
   clearActiveRoomSession();
   try { sessionStorage.removeItem(SETTLED_HAND_KEY); } catch (_) {}
   hasHandledInitialAutoEntry = false;
+  closeOnlineModal();
   logoutUser();
   setAuthMode("login");
 });
 
 // Navegação dos Cards do Hub
-const openOnlineModal = () => { SoundEngine.init(); showError(""); $("online-modal")?.classList.remove("hidden"); };
+const openOnlineModal = async () => {
+  SoundEngine.init();
+  showError("");
+  $("online-modal")?.classList.remove("hidden");
+  subscribePermanentRoomsLobby();
+  if (!permanentRoomsSeeded) await ensurePermanentRooms();
+};
 const openProfile = () => { SoundEngine.init(); showError(""); showScreen("profile-screen"); };
 
 on("card-play-online", "click", openOnlineModal);
-on("btn-close-online-modal", "click", () => $("online-modal")?.classList.add("hidden"));
-$("online-modal")?.addEventListener("click", (e) => { if (e.target === $("online-modal")) $("online-modal").classList.add("hidden"); });
+on("btn-close-online-modal", "click", closeOnlineModal);
+$("online-modal")?.addEventListener("click", (e) => { if (e.target === $("online-modal")) closeOnlineModal(); });
 
 on("card-open-profile", "click", openProfile);
 on("hub-profile-trigger", "click", openProfile);
 on("btn-profile-back", "click", () => showScreen("hub-screen"));
-
-if (pendingInviteCode && $("room-code")) {
-  $("room-code").value = pendingInviteCode;
-}
 
 setAuthMode("login");
 initUserSystem(db, renderAuthUI);
@@ -932,7 +1043,7 @@ function subscribeToRoom(code) {
     if (isLeavingRoom || localMode || currentRoomCode !== code) return;
 
     if (!snap.exists()) {
-      resetLocalRoomSession("A sala foi encerrada.");
+      resetLocalRoomSession("A ligação à mesa foi perdida.");
       return;
     }
 
@@ -945,7 +1056,7 @@ function subscribeToRoom(code) {
     if (stillInRoom) {
       wasSeatedInRoom = true;
     } else if (wasSeatedInRoom) {
-      resetLocalRoomSession("Foste removido da sala por inatividade.");
+      resetLocalRoomSession("Foste removido da mesa por inatividade.");
       return;
     }
 
@@ -971,7 +1082,6 @@ async function attemptReconnectToRoom(code) {
     const state = normalizeRoomState(raw);
     if (!state.players.some(p => p.id === myId)) {
       clearActiveRoomSession();
-      showError("A sessão na sala anterior expirou.");
       return false;
     }
 
@@ -993,39 +1103,56 @@ async function attemptReconnectToRoom(code) {
   }
 }
 
-async function joinOnlineRoom(rawCode, fromInvite = false) {
+async function joinPermanentRoom(roomId) {
+  SoundEngine.init();
   showError("");
+  if (isJoiningRoom) return;
   if (!isFirebaseConfigured || !db) return showError("Firebase não configurado.");
-  const entry = getLoggedBuyInOrError(); if (!entry) return false;
-  const code = extractRoomCode(rawCode);
-  if (!code) return showError("Introduz o código da sala.");
 
-  const btn = $("btn-join-room"), prev = btn?.textContent || "Entrar";
-  if (btn && !fromInvite) { btn.disabled = true; btn.textContent = "A entrar..."; }
+  const cfg = getPermanentRoomConfig(roomId);
+  if (!cfg) return showError("Mesa inválida.");
+
+  const entry = getLoggedBuyInOrError(cfg.buyIn, cfg.minEntry);
+  if (!entry) return;
+
+  isJoiningRoom = true;
+  renderPermanentRoomCards();
 
   try {
-    const roomRef = ref(db, `rooms/${code}`);
-    const existsSnap = await withTimeout(get(roomRef));
-    if (!existsSnap.exists()) {
-      showError(`Sala "${code}" não encontrada.`);
-      return false;
-    }
-
+    const roomRef = ref(db, `rooms/${cfg.id}`);
     let abortReason = "";
-    const txResult = await withTimeout(runTransaction(roomRef, (raw) => {
-      if (!raw) return raw;
-      const prevPresence = raw.presence || null;
-      const data = normalizeRoomState(raw);
-      const existingIdx = data.players.findIndex(p => p.id === myId);
 
+    const txResult = await withTimeout(runTransaction(roomRef, (raw) => {
+      let prevPresence = raw?.presence ? { ...raw.presence } : {};
+      let data = raw ? normalizeRoomState(raw) : createPermanentRoomState(cfg);
+
+      // Garantir sempre metadados da mesa vitalícia
+      data.roomId = cfg.id;
+      data.roomName = cfg.name;
+      data.permanent = true;
+      data.buyIn = cfg.buyIn;
+      data.smallBlind = cfg.smallBlind;
+      data.bigBlind = cfg.bigBlind;
+      data.tableLedIndex = cfg.ledIndex;
+
+      // Se a mesa só tiver fantasmas desligados há mais de 15s, limpa-a antes de entrar
+      if (data.players.length > 0 && isRoomAbandoned(data, prevPresence)) {
+        data = createPermanentRoomState(cfg);
+        prevPresence = {};
+      }
+
+      const existingIdx = data.players.findIndex(p => p.id === myId);
       if (existingIdx >= 0) {
         data.players[existingIdx].name = entry.name;
-        if (prevPresence) data.presence = prevPresence;
+        if (!data.hostId || !data.players.some(p => p.id === data.hostId)) {
+          data.hostId = myId;
+        }
+        data.presence = Object.keys(prevPresence).length ? prevPresence : null;
         return data;
       }
 
       if (data.players.length >= MAX_PLAYERS) {
-        abortReason = "A mesa já está cheia (6/6).";
+        abortReason = "Esta mesa já está cheia (6/6).";
         return undefined;
       }
 
@@ -1036,82 +1163,69 @@ async function joinOnlineRoom(rawCode, fromInvite = false) {
         status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
       });
 
-      if (data.phase === "WAITING" && data.players.length >= 2 && !data.nextHandDeadline) {
-        data.nextHandDeadline = Date.now() + AUTO_START_DELAY_MS;
-        data.message = `Jogadores na mesa (${data.players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`;
+      if (!data.hostId || !data.players.some(p => p.id === data.hostId)) {
+        data.hostId = myId;
       }
 
-      if (prevPresence) data.presence = prevPresence;
+      if (data.phase === "WAITING") {
+        if (data.players.length === 1) {
+          data.nextHandDeadline = 0;
+          data.message = `${cfg.name} (${formatEuro(cfg.buyIn)}) — A aguardar outro jogador...`;
+        } else if (data.players.length >= 2 && !data.nextHandDeadline) {
+          data.nextHandDeadline = Date.now() + AUTO_START_DELAY_MS;
+          data.message = `Jogadores na mesa (${data.players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`;
+        }
+      }
+
+      data.presence = Object.keys(prevPresence).length ? prevPresence : null;
       return data;
     }));
 
-    if (abortReason) { showError(abortReason); return false; }
+    if (abortReason) { showError(abortReason); return; }
     if (!txResult.committed || !txResult.snapshot.exists()) {
-      showError(`Sala "${code}" não encontrada.`);
-      return false;
+      showError("Não foi possível sentar na mesa. Tenta novamente.");
+      return;
     }
 
     const finalRaw = txResult.snapshot.val();
     myName = entry.name;
     localMode = false;
-    currentRoomCode = code;
+    currentRoomCode = cfg.id;
     roomState = normalizeRoomState(finalRaw);
     roomPresence = finalRaw.presence || {};
     wasSeatedInRoom = true;
     updateOfflineTrackers();
-    saveActiveRoomSession(code);
-    clearInviteFromURL();
-    attachPresence(code);
+    saveActiveRoomSession(cfg.id);
+    attachPresence(cfg.id);
     openGameScreen();
     renderGame();
-    subscribeToRoom(code);
-    return true;
+    subscribeToRoom(cfg.id);
   } catch (err) {
     showError(String(err?.message || err));
-    return false;
   } finally {
-    if (btn && !fromInvite) { btn.disabled = false; btn.textContent = prev; }
+    isJoiningRoom = false;
+    renderPermanentRoomCards();
   }
 }
 
-on("btn-create-room", "click", async () => {
-  SoundEngine.init(); showError("");
-  if (!isFirebaseConfigured || !db) return showError("Firebase não configurado.");
-  const entry = getLoggedBuyInOrError(); if (!entry) return;
-  const btn = $("btn-create-room"), prev = btn.textContent;
-  btn.disabled = true; btn.textContent = "A criar sala...";
-  try {
-    myName = entry.name; localMode = false; currentRoomCode = generateRoomCode();
-    const initial = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
-    await withTimeout(set(ref(db, `rooms/${currentRoomCode}`), initial));
-    roomState = initial;
-    roomPresence = {};
-    wasSeatedInRoom = true;
-    offlineSinceMap.clear();
-    saveActiveRoomSession(currentRoomCode);
-    clearInviteFromURL();
-    attachPresence(currentRoomCode);
-    openGameScreen();
-    renderGame();
-    subscribeToRoom(currentRoomCode);
-  } catch (err) { showError(String(err?.message || err)); }
-  finally { btn.disabled = false; btn.textContent = prev; }
+PERMANENT_ROOMS.forEach(cfg => {
+  on(`room-card-${cfg.id}`, "click", () => joinPermanentRoom(cfg.id));
 });
-
-on("btn-join-room", "click", () => {
-  SoundEngine.init();
-  joinOnlineRoom($("room-code")?.value || "", false);
-});
-
-on("room-code", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-join-room")?.click(); } });
 
 function startBotsGame() {
   SoundEngine.init(); showError("");
-  const entry = getLoggedBuyInOrError(); if (!entry) return;
+  const entry = getLoggedBuyInOrError(STARTING_CHIPS, BIG_BLIND); if (!entry) return;
   clearActiveRoomSession();
   detachPresence(false);
   myName = entry.name; localMode = true; currentRoomCode = "OFFLINE";
-  const demo = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
+  const demo = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex(), {
+    roomId: "OFFLINE",
+    roomName: "Mesa vs Bots",
+    permanent: false,
+    buyIn: STARTING_CHIPS,
+    smallBlind: SMALL_BLIND,
+    bigBlind: BIG_BLIND
+  });
   ["Tiago", "Marta", "Rui", "Inês"].forEach((name, i) => demo.players.push({
     id: `bot_${i}`, name, chips: STARTING_CHIPS, handStartChips: STARTING_CHIPS,
     bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
@@ -1127,23 +1241,15 @@ function setQuickRaise(mode) {
   const me = roomState?.players.find(p => p.id === myId), slider = $("raise-slider");
   if (!me || !slider || slider.disabled) return;
   const minR = Number(slider.min), maxR = Number(slider.max);
+  const roundStep = Math.max(10, Number(roomState.smallBlind) || 10);
   const potAfter = roomState.pot + Math.max(0, roomState.currentBet - me.bet);
   let target = minR;
-  if (mode === "half") target = Math.round((roomState.currentBet + potAfter * 0.5) / 10) * 10;
-  else if (mode === "pot") target = Math.round((roomState.currentBet + potAfter) / 10) * 10;
+  if (mode === "half") target = Math.round((roomState.currentBet + potAfter * 0.5) / roundStep) * roundStep;
+  else if (mode === "pot") target = Math.round((roomState.currentBet + potAfter) / roundStep) * roundStep;
   target = Math.max(minR, Math.min(maxR, target));
   slider.value = target;
-  if ($("raise-value")) $("raise-value").textContent = target;
+  if ($("raise-value")) $("raise-value").textContent = target.toLocaleString("pt-PT");
 }
-
-const copyCode = (e) => {
-  if (!currentRoomCode) return;
-  const payload = localMode ? currentRoomCode : buildInviteLink(currentRoomCode);
-  navigator.clipboard?.writeText(payload).catch(() => {});
-  const btn = e.currentTarget, prev = btn.textContent;
-  btn.textContent = localMode ? "Copiado ✓" : "Link copiado ✓";
-  setTimeout(() => { btn.textContent = prev; }, 1500);
-};
 
 async function leaveCurrentRoom() {
   if (isLeavingRoom) return;
@@ -1182,12 +1288,12 @@ on("btn-fold", "click", () => handleAction(myId, "fold"));
 on("btn-check-call", "click", () => handleAction(myId, "check-call"));
 on("btn-raise", "click", () => handleAction(myId, "raise", Number($("raise-slider")?.value || 0)));
 on("btn-allin", "click", () => handleAction(myId, "allin"));
-on("raise-slider", "input", (e) => { if ($("raise-value")) $("raise-value").textContent = e.target.value; });
+on("raise-slider", "input", (e) => {
+  if ($("raise-value")) $("raise-value").textContent = Number(e.target.value || 0).toLocaleString("pt-PT");
+});
 on("btn-bet-min", "click", () => setQuickRaise("min"));
 on("btn-bet-half", "click", () => setQuickRaise("half"));
 on("btn-bet-pot", "click", () => setQuickRaise("pot"));
-on("btn-copy-code", "click", copyCode);
-on("btn-waiting-copy", "click", copyCode);
 on("btn-leave", "click", leaveCurrentRoom);
 
 /* ============================================================================
