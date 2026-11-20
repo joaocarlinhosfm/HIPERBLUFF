@@ -3,6 +3,7 @@ const CORE_ASSETS = [
   "./",
   "./index.html",
   "./style.css",
+  "./menus.css",
   "./game.js",
   "./audio.js",
   "./poker.js",
