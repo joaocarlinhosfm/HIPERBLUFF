@@ -6,18 +6,17 @@
   --felt-mid: #0e5233;
   --felt-edge: #072b1a;
   --rail-outer: #26160e;
-  --rail-inner: #5c3a24;
+  --rail-inner: #593823;
   --gold: #f5b942;
   --ice-bright: #e0f2fe;
   --ice-cyan: #38bdf8;
-  --ice-deep: #0284c7;
   --ice-border: rgba(125, 211, 252, 0.35);
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
   --red: #dc2626;
-  --blue: #2563eb;
-  --green: #16a34a;
-  --purple: #7c3aed;
+  --led-core: #38bdf8;
+  --led-bright: #bae6fd;
+  --led-glow-soft: rgba(56, 189, 248, 0.42);
 }
 
 * {
@@ -53,22 +52,75 @@ body {
   position: relative;
 }
 
-.screen.active {
-  display: flex;
-  flex-direction: column;
+.screen.active { display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+/* ================= BLOQUEIO VERTICAL (OBRIGA HORIZONTAL EM MOBILE) ================= */
+.portrait-lock {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  padding: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.24), transparent 50%),
+    linear-gradient(180deg, #0b1f38 0%, #050d18 100%);
 }
 
-.hidden {
-  display: none !important;
+@media (orientation: portrait) and (max-width: 900px) {
+  .portrait-lock { display: flex; }
 }
 
-/* ================= LOBBY — TEMA FRIO / GLACIAL ================= */
+.portrait-lock-card {
+  width: 100%;
+  max-width: 330px;
+  padding: 1.8rem 1.4rem;
+  text-align: center;
+  border-radius: 22px;
+  background: linear-gradient(165deg, rgba(16, 39, 66, 0.92), rgba(7, 19, 33, 0.96));
+  border: 1.5px solid var(--ice-border);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.75), 0 0 32px rgba(56, 189, 248, 0.2);
+}
+
+.rotate-phone-icon {
+  font-size: 3rem;
+  margin-bottom: 0.7rem;
+  display: inline-block;
+  animation: tiltPhone 2.1s ease-in-out infinite;
+}
+
+@keyframes tiltPhone {
+  0%, 20% { transform: rotate(0deg); }
+  55%, 80% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.portrait-lock-card h2 {
+  font-size: 1.35rem;
+  color: #bae6fd;
+  margin-bottom: 0.5rem;
+  letter-spacing: 1px;
+}
+
+.portrait-lock-card p {
+  font-size: 0.9rem;
+  color: #93c5fd;
+  line-height: 1.45;
+  margin-bottom: 1.25rem;
+}
+
+/* ================= LOBBY HORIZONTAL (TEMA FRIO / GLACIAL) ================= */
 #lobby-screen {
   position: relative;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  overflow-y: auto;
+  padding:
+    max(0.75rem, env(safe-area-inset-top))
+    max(1.2rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom))
+    max(1.2rem, env(safe-area-inset-left));
   background:
     radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.22), transparent 45%),
     radial-gradient(circle at 82% 80%, rgba(14, 165, 233, 0.18), transparent 45%),
@@ -91,7 +143,7 @@ body {
   animation: snowfall linear infinite;
 }
 
-.f1  { left: 6%;  font-size: 1.1rem; animation-duration: 11s; animation-delay: 0s;   opacity: 0.7; }
+.f1  { left: 6%;  font-size: 1.1rem; animation-duration: 11s; opacity: 0.7; }
 .f2  { left: 14%; font-size: 0.7rem; animation-duration: 8s;  animation-delay: -3s;  opacity: 0.5; }
 .f3  { left: 23%; font-size: 1.3rem; animation-duration: 14s; animation-delay: -6s;  opacity: 0.6; }
 .f4  { left: 32%; font-size: 0.6rem; animation-duration: 9s;  animation-delay: -1s;  opacity: 0.45; }
@@ -113,14 +165,18 @@ body {
 .lobby-card {
   position: relative;
   z-index: 2;
-  background: linear-gradient(165deg, rgba(16, 39, 66, 0.84) 0%, rgba(8, 20, 36, 0.92) 100%);
+  display: grid;
+  grid-template-columns: 0.86fr 1.14fr;
+  align-items: center;
+  gap: 1.6rem;
+  width: 100%;
+  max-width: 740px;
+  padding: 1.5rem 1.8rem;
+  border-radius: 22px;
+  background: linear-gradient(165deg, rgba(16, 39, 66, 0.86) 0%, rgba(8, 20, 36, 0.94) 100%);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1.5px solid var(--ice-border);
-  border-radius: 22px;
-  padding: 1.8rem 2rem 1.7rem;
-  width: 100%;
-  max-width: 425px;
   box-shadow:
     0 24px 65px rgba(0, 0, 0, 0.68),
     0 0 38px rgba(56, 189, 248, 0.16),
@@ -139,34 +195,23 @@ body {
   opacity: 0.85;
 }
 
-.lobby-logo-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 0.45rem;
-}
+.lobby-logo-wrap { display: flex; justify-content: center; margin-bottom: 0.55rem; }
 
 .lobby-logo {
-  width: 112px;
-  height: 112px;
+  width: 106px;
+  height: 106px;
   border-radius: 22px;
   object-fit: cover;
   border: 2px solid rgba(186, 230, 253, 0.45);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.55),
-    0 0 24px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 24px rgba(56, 189, 248, 0.35);
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-}
+.brand { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
 
 .brand h1 {
-  font-size: 2rem;
+  font-size: 1.85rem;
   font-weight: 900;
-  letter-spacing: 3px;
+  letter-spacing: 2.5px;
   background: linear-gradient(180deg, #ffffff 0%, #bae6fd 52%, #38bdf8 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -174,75 +219,125 @@ body {
   filter: drop-shadow(0 2px 10px rgba(56, 189, 248, 0.45));
 }
 
-.brand-suit {
-  font-size: 1.55rem;
-  color: #bae6fd;
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+.brand-suit { font-size: 1.45rem; color: #bae6fd; text-shadow: 0 0 10px rgba(56, 189, 248, 0.6); }
+.brand-suit.ice { color: #38bdf8; }
+.subtitle { color: #93c5fd; font-size: 0.86rem; margin-top: 0.35rem; letter-spacing: 0.4px; }
+
+/* ================= AUTENTICAÇÃO, INPUTS E CARTEIRA ================= */
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  background: rgba(4, 12, 24, 0.78);
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  border-radius: 12px;
+  padding: 0.24rem;
+  margin-bottom: 0.9rem;
 }
 
-.brand-suit.ice {
-  color: #38bdf8;
-}
-
-.subtitle {
+.auth-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 0.52rem 0.6rem;
   color: #93c5fd;
+  font-weight: 700;
   font-size: 0.88rem;
-  margin: 0.35rem 0 1.45rem;
-  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.form-group {
-  text-align: left;
-  margin-bottom: 1.05rem;
+.auth-tab.active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(2, 132, 199, 0.52));
+  border-color: rgba(186, 230, 253, 0.55);
+  color: #ffffff;
+  box-shadow: 0 2px 12px rgba(14, 165, 233, 0.28);
 }
+
+.form-group { text-align: left; margin-bottom: 0.85rem; }
 
 .form-group label {
   display: block;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: #bae6fd;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.3rem;
   font-weight: 600;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
-  padding: 0.78rem 1rem;
+  padding: 0.72rem 0.95rem;
   border-radius: 12px;
-  border: 1px solid rgba(125, 211, 252, 0.28);
-  background: rgba(4, 12, 24, 0.82);
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  background: rgba(4, 12, 24, 0.86);
   color: #f0f9ff;
   font-size: 1rem;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-input[type="text"]::placeholder {
-  color: #64748b;
-}
+input[type="text"]::placeholder,
+input[type="password"]::placeholder { color: #64748b; }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus {
   border-color: var(--ice-cyan);
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
 }
 
-.join-row {
-  display: flex;
-  gap: 0.6rem;
+#auth-pin {
+  text-align: center;
+  letter-spacing: 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 
-.join-row input {
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  text-align: center;
-  font-weight: 700;
+.auth-hint { margin-top: 0.45rem; font-size: 0.74rem; color: #7dd3fc; }
+.error-msg { color: #fda4af; font-size: 0.8rem; margin-top: 0.55rem; min-height: 1.05rem; }
+
+.user-profile-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(4, 15, 30, 0.84);
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 14px;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.75rem;
+  text-align: left;
 }
+
+.user-profile-info { display: flex; flex-direction: column; min-width: 0; }
+.profile-username { font-weight: 800; font-size: 0.94rem; color: #f0f9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-stats { font-size: 0.68rem; color: #93c5fd; }
+.user-profile-right { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; }
+
+.profile-balance {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+  border: 1.5px solid rgba(245, 185, 66, 0.75);
+  color: var(--gold);
+  font-weight: 900;
+  font-size: 0.86rem;
+  padding: 0.24rem 0.68rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.join-row { display: flex; gap: 0.55rem; }
+.join-row input { text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: 700; }
 
 .divider {
   display: flex;
   align-items: center;
-  margin: 1.05rem 0;
+  margin: 0.75rem 0;
   color: #7dd3fc;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 1px;
   opacity: 0.8;
@@ -256,41 +351,23 @@ input[type="text"]:focus {
   background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.35), transparent);
 }
 
-.divider span {
-  padding: 0 0.7rem;
-}
-
-.error-msg {
-  color: #fda4af;
-  font-size: 0.84rem;
-  margin-top: 0.75rem;
-  min-height: 1.15rem;
-}
+.divider span { padding: 0 0.65rem; }
 
 /* ================= BOTÕES ================= */
 .btn {
   border: none;
   border-radius: 11px;
-  padding: 0.8rem 1.2rem;
+  padding: 0.72rem 1.15rem;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   cursor: pointer;
-  transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.1s ease, filter 0.15s ease;
   color: #fff;
 }
 
-.btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.btn:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.btn:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-}
+.btn:hover:not(:disabled) { filter: brightness(1.1); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.42; cursor: not-allowed; }
 
 .btn-primary {
   background: linear-gradient(135deg, #7dd3fc 0%, #0ea5e9 55%, #0369a1 100%);
@@ -299,66 +376,34 @@ input[type="text"]:focus {
   box-shadow: 0 6px 20px rgba(14, 165, 233, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
-.btn-secondary {
-  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
-  border: 1px solid rgba(147, 197, 253, 0.35);
-  min-width: 105px;
-}
-
-.btn-outline {
-  background: rgba(14, 37, 64, 0.55);
-  border: 1px solid rgba(125, 211, 252, 0.32);
-  color: #e0f2fe;
-  width: 100%;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: rgba(56, 189, 248, 0.14);
-  border-color: rgba(186, 230, 253, 0.6);
-}
-
-.btn-danger {
-  background: linear-gradient(180deg, #ef4444, #b91c1c);
-  box-shadow: 0 4px 14px rgba(185, 28, 28, 0.4);
-}
-
-.btn-rebuy {
-  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
-  color: #111827;
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
-}
-
-.btn-sm {
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-  width: auto;
-}
+.btn-secondary { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); border: 1px solid rgba(147, 197, 253, 0.35); min-width: 100px; }
+.btn-outline { background: rgba(14, 37, 64, 0.55); border: 1px solid rgba(125, 211, 252, 0.32); color: #e0f2fe; width: 100%; }
+.btn-danger { background: linear-gradient(180deg, #ef4444, #b91c1c); box-shadow: 0 4px 14px rgba(185, 28, 28, 0.4); }
+.btn-rebuy { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); color: #111827; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4); }
+.btn-install { margin-top: 0.55rem; width: 100%; background: linear-gradient(135deg, #0d9488, #0f766e); border: 1px solid rgba(94, 234, 212, 0.35); color: #f0fdfa; }
+.btn-sm { padding: 0.42rem 0.85rem; font-size: 0.82rem; width: auto; }
+.btn-icon { background: #132842; border: 1px solid var(--panel-border); padding: 0.36rem 0.6rem; font-size: 0.9rem; line-height: 1; }
 
 .btn-tiny {
   background: #1e3a5f;
   color: #e0f2fe;
   border: 1px solid rgba(125, 211, 252, 0.3);
   border-radius: 6px;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
   cursor: pointer;
   margin-left: 0.35rem;
 }
 
-.btn-icon {
-  background: #132842;
-  border: 1px solid var(--panel-border);
-  padding: 0.4rem 0.65rem;
-  font-size: 0.95rem;
-  line-height: 1;
-}
+.btn-logout { margin-left: 0; background: rgba(220, 38, 38, 0.22); border-color: rgba(248, 113, 113, 0.45); color: #fecaca; }
 
 /* ================= TOP BAR (NORMAL vs FULLSCREEN) ================= */
 .top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1.2rem;
+  padding: 0.45rem 1.1rem;
   background: rgba(8, 20, 36, 0.92);
   border-bottom: 1px solid rgba(125, 211, 252, 0.2);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
@@ -366,38 +411,14 @@ input[type="text"]:focus {
   flex-shrink: 0;
 }
 
-.top-left,
-.top-center,
-.top-right {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
+.top-left, .top-center, .top-right { display: flex; align-items: center; gap: 0.55rem; }
+.logo-mini { font-weight: 800; letter-spacing: 2px; color: #bae6fd; text-shadow: 0 0 10px rgba(56, 189, 248, 0.45); }
+.badge { background: #0f2942; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); padding: 0.18rem 0.52rem; border-radius: 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; }
 
-.logo-mini {
-  font-weight: 800;
-  letter-spacing: 2px;
-  color: #bae6fd;
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
-}
-
-.badge {
-  background: #0f2942;
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-/* FULLSCREEN: remove header e deixa apenas o botão Sair no canto superior direito */
 body.is-fullscreen #game-screen .top-bar {
   position: fixed;
   top: max(8px, env(safe-area-inset-top));
   right: max(10px, env(safe-area-inset-right));
-  left: auto;
   width: auto;
   padding: 0;
   background: transparent;
@@ -409,1724 +430,27 @@ body.is-fullscreen #game-screen .top-bar {
 
 body.is-fullscreen #game-screen .top-left,
 body.is-fullscreen #game-screen .top-center,
-body.is-fullscreen #game-screen #btn-fullscreen {
-  display: none !important;
-}
+body.is-fullscreen #game-screen #btn-fullscreen { display: none !important; }
+body.is-fullscreen #game-screen .top-right { pointer-events: auto; }
+body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34rem 0.82rem; font-size: 0.76rem; border: 1px solid rgba(254, 202, 202, 0.35); }
 
-body.is-fullscreen #game-screen .top-right {
-  pointer-events: auto;
-}
-
-body.is-fullscreen #game-screen #btn-leave {
-  border-radius: 999px;
-  padding: 0.34rem 0.82rem;
-  font-size: 0.78rem;
-  opacity: 0.92;
-  border: 1px solid rgba(254, 202, 202, 0.35);
-}
-
-/* ================= AVISO DISCRETO EM MOBILE VERTICAL ================= */
-.rotate-hint {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.8rem;
-  background: rgba(14, 165, 233, 0.16);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.32);
-  color: #bae6fd;
-  font-size: 0.74rem;
-  font-weight: 600;
-  z-index: 15;
-}
-
-@media (orientation: portrait) and (max-width: 640px) {
-  .rotate-hint:not(.dismissed) {
-    display: flex;
-  }
-}
-
-/* ================= MESA DE POKER (PROPORÇÕES COMPACTAS ZYNGA) ================= */
+/* ================= MESA 3D INCLINADA + FITA LED DINÂMICA ================= */
 .table-area {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4.2rem 6.5rem 7.8rem;
+  padding: 3.8rem 6.2rem 7.4rem;
   position: relative;
 }
 
 .poker-table {
   position: relative;
-  width: min(720px, 64vw);
-  height: min(350px, 47dvh);
-  border-radius: 210px;
-  background:
-    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.08) 0%, transparent 58%),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0px, rgba(255, 255, 255, 0.012) 2px, transparent 2px, transparent 4px),
-    radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 58%, var(--felt-edge) 100%);
-  border: 16px solid var(--rail-inner);
-  box-shadow:
-    inset 0 0 0 2px rgba(253, 224, 71, 0.42),
-    inset 0 0 65px rgba(0, 0, 0, 0.72),
-    0 0 0 4px var(--rail-outer),
-    0 0 0 6px rgba(245, 185, 66, 0.18),
-    0 26px 65px rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.table-betting-line {
-  position: absolute;
-  inset: 20px 28px;
-  border-radius: 185px;
-  border: 1.5px solid rgba(253, 224, 71, 0.24);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.2);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.table-watermark {
-  position: absolute;
-  bottom: 16%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.85rem;
-  font-weight: 900;
-  letter-spacing: 5px;
-  color: rgba(255, 255, 255, 0.07);
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 1;
-}
-
-/* ================= DEALER FIXA NO TOPO ================= */
-.dealer-seat {
-  position: absolute;
-  left: 50%;
-  top: -12%;
-  transform: translate(-50%, -38%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 6;
-  pointer-events: none;
-}
-
-.dealer-avatar-wrap {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 3px solid var(--gold);
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.75),
-    0 0 18px rgba(245, 185, 66, 0.38),
-    inset 0 0 10px rgba(0, 0, 0, 0.45);
-  overflow: hidden;
-  background: #071321;
-}
-
-.dealer-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.dealer-plate {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: -12px;
-  background: linear-gradient(180deg, #1e293b, #0f172a);
-  border: 1.5px solid var(--gold);
-  padding: 0.16rem 0.85rem;
-  border-radius: 999px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
-  z-index: 2;
-}
-
-.dealer-tag {
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 1.8px;
-  color: var(--gold);
-}
-
-.next-hand-pill {
-  background: var(--gold);
-  color: #0f172a;
-  font-weight: 800;
-  font-size: 0.66rem;
-  padding: 0.08rem 0.42rem;
-  border-radius: 999px;
-}
-
-.dealer-speech {
-  margin-top: 5px;
-  background: rgba(7, 19, 33, 0.88);
-  border: 1px solid rgba(125, 211, 252, 0.22);
-  color: #e2e8f0;
-  font-size: 0.74rem;
-  font-weight: 600;
-  padding: 0.2rem 0.82rem;
-  border-radius: 999px;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-}
-
-.waiting-room-pill {
-  margin-top: 5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: rgba(10, 26, 46, 0.94);
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  color: #bae6fd;
-  font-size: 0.72rem;
-  padding: 0.18rem 0.62rem;
-  border-radius: 999px;
-  pointer-events: auto;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-}
-
-/* ================= CENTRO DO FELTRO (POTE + SIDE POTS + CARTAS + BANNER) ================= */
-.table-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.45rem;
-  z-index: 3;
-  margin-top: 0.4rem;
-  position: relative;
-}
-
-.pot-zone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  min-height: 30px;
-}
-
-.pot-chips {
-  display: flex;
-  align-items: flex-end;
-  gap: 5px;
-  height: 28px;
-}
-
-.chip-stack {
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-}
-
-.poker-chip {
-  width: 20px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1.5px dashed rgba(255, 255, 255, 0.88);
-  margin-top: -3px;
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -2px 2px rgba(0, 0, 0, 0.55),
-    0 2px 4px rgba(0, 0, 0, 0.65);
-}
-
-.chip-500 { background: linear-gradient(90deg, #6d28d9, #8b5cf6, #5b21b6); }
-.chip-100 { background: linear-gradient(90deg, #0f172a, #334155, #0f172a); }
-.chip-25  { background: linear-gradient(90deg, #15803d, #22c55e, #14532d); }
-.chip-10  { background: linear-gradient(90deg, #1d4ed8, #3b82f6, #1e3a8a); }
-.chip-5   { background: linear-gradient(90deg, #b91c1c, #ef4444, #991b1b); }
-
-.pot-display {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(7, 15, 28, 0.94));
-  border: 1.5px solid rgba(245, 185, 66, 0.65);
-  padding: 0.24rem 0.92rem;
-  border-radius: 999px;
-  font-weight: 800;
-  color: var(--gold);
-  font-size: 0.94rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-.pot-label {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  letter-spacing: 1.2px;
-}
-
-.side-pots-display {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.35rem;
-}
-
-.side-pot-tag {
-  background: rgba(7, 19, 33, 0.84);
-  border: 1px solid rgba(125, 211, 252, 0.4);
-  color: #bae6fd;
-  font-size: 0.64rem;
-  font-weight: 700;
-  padding: 1px 8px;
-  border-radius: 999px;
-}
-
-.community-cards {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 82px;
-  align-items: center;
-}
-
-.winning-hand-banner {
-  margin-top: 2px;
-  padding: 0.28rem 2rem;
-  font-size: 1.18rem;
-  font-weight: 900;
-  letter-spacing: 2.2px;
-  color: #111827;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
-  background: linear-gradient(
-    90deg,
-    rgba(249, 115, 22, 0) 0%,
-    rgba(251, 146, 60, 0.92) 22%,
-    rgba(253, 224, 71, 0.98) 50%,
-    rgba(251, 146, 60, 0.92) 78%,
-    rgba(249, 115, 22, 0) 100%
-  );
-  border-radius: 6px;
-  box-shadow: 0 0 24px rgba(251, 146, 60, 0.55);
-  animation: bannerPop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-@keyframes bannerPop {
-  0% { opacity: 0; transform: scale(0.8); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* ================= CARTAS HD (FRENTE E VERSO GLACIAL) ================= */
-.card {
-  width: 56px;
-  height: 80px;
-  background: linear-gradient(155deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
-  border: 1px solid rgba(15, 23, 42, 0.16);
-  border-radius: 8px;
-  color: #0f172a;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 3px 4px;
-  font-weight: 900;
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  position: relative;
-  transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
-}
-
-.card.red {
-  color: #dc2626;
-}
-
-.card-corner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 0.92;
-  width: 15px;
-}
-
-.card-corner.bottom {
-  align-self: flex-end;
-  transform: rotate(180deg);
-}
-
-.card-rank {
-  font-size: 0.92rem;
-  letter-spacing: -0.5px;
-}
-
-.card-suit-mini {
-  font-size: 0.7rem;
-}
-
-.card-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.65rem;
-  line-height: 1;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12));
-}
-
-.card.back {
-  background: linear-gradient(145deg, #f8fafc, #cbd5e1);
-  padding: 2.5px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-}
-
-.card-back-inner {
-  width: 100%;
-  height: 100%;
-  border-radius: 4px;
-  border: 1px solid rgba(125, 211, 252, 0.55);
-  background:
-    repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
-    repeating-linear-gradient(-45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
-    radial-gradient(circle at center, #1d4ed8 0%, #0f172a 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-back-emblem {
-  color: rgba(186, 230, 253, 0.85);
-  font-size: 1rem;
-  text-shadow: 0 0 8px rgba(56, 189, 248, 0.85);
-}
-
-/* Mini cartas dos adversários no feltro (estilo Zynga) */
-.card.small {
-  width: 28px;
-  height: 40px;
-  padding: 2px;
-  border-radius: 5px;
-}
-
-.card.small .card-corner {
-  width: 9px;
-}
-
-.card.small .card-rank {
-  font-size: 0.56rem;
-}
-
-.card.small .card-suit-mini {
-  font-size: 0.44rem;
-}
-
-.card.small .card-center {
-  font-size: 0.82rem;
-}
-
-.card.small .card-back-emblem {
-  font-size: 0.62rem;
-}
-
-.card.card-win {
-  border: 2.5px solid #fde047;
-  box-shadow:
-    0 0 18px 4px rgba(251, 191, 36, 0.9),
-    0 0 8px 1px rgba(255, 255, 255, 0.85);
-  z-index: 8 !important;
-  filter: brightness(1.06);
-}
-
-.community-cards .card.card-win {
-  transform: translateY(-6px) scale(1.06);
-}
-
-.card.card-dim {
-  filter: brightness(0.45) saturate(0.55);
-  opacity: 0.82;
-}
-
-/* ================= LUGARES NO ESQUEMA ZYNGA (5 LUGARES PADRÃO + 6 LUGARES) ================= */
-.seats-container {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.seat {
-  position: absolute;
-  width: 112px;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transition: opacity 0.25s ease;
-}
-
-/* Padrão até 5 jogadores — EXATO ESQUEMA ZYNGA (Tu no centro inferior) */
-.seat-0 { left: 50%; top: 103%; }  /* Tu (Centro inferior) */
-.seat-1 { left: 5%;  top: 78%;  }  /* Inferior esquerdo */
-.seat-2 { left: 19%; top: -4%;  }  /* Superior esquerdo */
-.seat-3 { left: 81%; top: -4%;  }  /* Superior direito */
-.seat-4 { left: 95%; top: 78%;  }  /* Inferior direito */
-.seat-5 { display: none; }         /* Oculto até existir 6.º jogador */
-
-/* Modo 6 jogadores (simétrico) */
-.poker-table.six-players .seat-0 { left: 32%; top: 103%; }
-.poker-table.six-players .seat-1 { left: -2%; top: 52%;  }
-.poker-table.six-players .seat-2 { left: 20%; top: -4%;  }
-.poker-table.six-players .seat-3 { left: 80%; top: -4%;  }
-.poker-table.six-players .seat-4 { left: 102%; top: 52%; }
-.poker-table.six-players .seat-5 { display: flex; left: 68%; top: 103%; }
-
-.seat-avatar-stack {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* ---- CARTAS DO HERÓI ("TU"): À FRENTE DA METADE INFERIOR DO CÍRCULO (ESTILO ZYNGA) ---- */
-.hero-cards {
-  position: absolute;
-  top: 48%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 6;
-  pointer-events: none;
-}
-
-.hero-cards .card {
-  width: 52px;
-  height: 74px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.72), 0 0 12px rgba(56, 189, 248, 0.25);
-}
-
-.hero-cards .card:first-child {
-  transform: rotate(-10deg);
-  margin-right: -11px;
-  z-index: 1;
-}
-
-.hero-cards .card:last-child {
-  transform: rotate(10deg);
-  z-index: 2;
-}
-
-/* Nome do herói sobe para a metade superior do círculo quando tem cartas */
-.seat.is-me.has-cards .seat-circle {
-  justify-content: flex-start;
-  padding-top: 9px;
-}
-
-.seat.is-me.has-cards .seat-chips {
-  margin-top: 34px;
-}
-
-/* Aposta do Herói: SEMPRE acima do círculo, dentro do feltro (nunca tapa as cartas!) */
-.seat-0 .hero-bet-zone {
-  position: absolute;
-  bottom: calc(100% + 14px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  pointer-events: none;
-}
-
-/* ---- ADVERSÁRIOS: CARTAS + APOSTA LADO A LADO DENTRO DO FELTRO (ESTILO ZYNGA) ---- */
-.seat-felt-zone {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.opp-cards {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.opp-cards .card:first-child {
-  transform: rotate(-10deg);
-  margin-right: -8px;
-  z-index: 1;
-}
-
-.opp-cards .card:last-child {
-  transform: rotate(10deg);
-  z-index: 2;
-}
-
-/* Quando reveladas no Showdown ou Run-out, as cartas dos adversários crescem para leitura perfeita */
-.opp-cards.revealed .card {
-  width: 48px;
-  height: 68px;
-  padding: 3px 4px;
-  border-radius: 7px;
-}
-
-.opp-cards.revealed .card-corner {
-  width: 13px;
-}
-
-.opp-cards.revealed .card-rank {
-  font-size: 0.78rem;
-}
-
-.opp-cards.revealed .card-suit-mini {
-  font-size: 0.6rem;
-}
-
-.opp-cards.revealed .card-center {
-  font-size: 1.35rem;
-}
-
-/* Posicionamento no feltro por lugar (5 lugares padrão) */
-.seat-1 .seat-felt-zone {
-  left: 96%;
-  top: 22%;
-  flex-direction: row;
-}
-
-.seat-2 .seat-felt-zone {
-  top: 108%;
-  left: 56%;
-  transform: translateX(-50%);
-  flex-direction: row-reverse;
-}
-
-.seat-3 .seat-felt-zone {
-  top: 108%;
-  left: 44%;
-  transform: translateX(-50%);
-  flex-direction: row;
-}
-
-.seat-4 .seat-felt-zone {
-  right: 96%;
-  top: 22%;
-  flex-direction: row-reverse;
-}
-
-/* Ajustes de zona no feltro para modo 6 lugares */
-.poker-table.six-players .seat-1 .seat-felt-zone {
-  left: 98%;
-  top: 42%;
-  transform: translateY(-50%);
-  flex-direction: row;
-}
-
-.poker-table.six-players .seat-4 .seat-felt-zone {
-  right: 98%;
-  top: 42%;
-  transform: translateY(-50%);
-  flex-direction: row-reverse;
-}
-
-.poker-table.six-players .seat-5 .seat-felt-zone {
-  bottom: 112%;
-  left: 50%;
-  transform: translateX(-50%);
-  flex-direction: row;
-}
-
-/* Círculo do Jogador */
-.seat-ring {
-  position: relative;
-  width: 78px;
-  height: 78px;
-  border-radius: 50%;
-  padding: 3px;
-  background: linear-gradient(145deg, #3b5b82, #17273b);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 8px 22px rgba(0, 0, 0, 0.65),
-    inset 0 1px 1px rgba(255, 255, 255, 0.25);
-  z-index: 3;
-}
-
-.seat.is-me .seat-ring {
-  width: 84px;
-  height: 84px;
-  background: linear-gradient(135deg, #7dd3fc, #0284c7);
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 8px 20px rgba(0, 0, 0, 0.65);
-}
-
-.seat.active-turn .seat-ring {
-  padding: 4px;
-  box-shadow: 0 0 24px rgba(245, 185, 66, 0.68);
-}
-
-.seat.is-winner .seat-ring {
-  background: linear-gradient(135deg, #fef08a, #f59e0b, #ea580c);
-  padding: 4px;
-  animation: winnerPulse 1.1s ease-in-out infinite alternate;
-}
-
-@keyframes winnerPulse {
-  0% {
-    box-shadow: 0 0 18px 4px rgba(251, 191, 36, 0.75), 0 0 32px rgba(249, 115, 22, 0.5);
-  }
-  100% {
-    box-shadow: 0 0 28px 8px rgba(253, 224, 71, 0.95), 0 0 46px rgba(249, 115, 22, 0.75);
-  }
-}
-
-.winner-badge {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, #fef08a 0%, #f59e0b 100%);
-  color: #111827;
-  font-size: 0.64rem;
-  font-weight: 900;
-  letter-spacing: 1px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  border: 1.5px solid #fffbeb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
-  z-index: 9;
-  white-space: nowrap;
-}
-
-.seat-circle {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 25%, #1d3b5e 0%, #091525 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  text-align: center;
-  overflow: hidden;
-  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.08);
-}
-
-.seat.folded {
-  opacity: 0.45;
-}
-
-.seat.empty .seat-ring {
-  width: 58px;
-  height: 58px;
-  background: transparent;
-  border: 1.5px dashed rgba(125, 211, 252, 0.25);
-  box-shadow: none;
-}
-
-.seat.empty .seat-circle {
-  background: rgba(16, 32, 51, 0.28);
-}
-
-.seat-empty-label {
-  font-size: 0.68rem;
-  color: rgba(148, 163, 184, 0.7);
-  font-weight: 600;
-}
-
-.seat-name {
-  font-weight: 800;
-  font-size: 0.8rem;
-  color: #f8fafc;
-  line-height: 1.1;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.seat-you-tag {
-  font-size: 0.56rem;
-  font-weight: 800;
-  color: #38bdf8;
-  letter-spacing: 1px;
-  margin-top: 2px;
-}
-
-.seat-chips {
-  margin-top: 6px;
-  font-size: 0.82rem;
-  color: #ffffff;
-  font-weight: 800;
-  background: rgba(7, 19, 33, 0.9);
-  border: 1px solid rgba(245, 185, 66, 0.45);
-  padding: 2px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
-  z-index: 7;
-}
-
-.seat.is-me .seat-chips {
-  color: var(--gold);
-  border-color: rgba(245, 185, 66, 0.65);
-}
-
-.seat-status {
-  margin-top: 3px;
-  font-size: 0.63rem;
-  font-weight: 700;
-  color: #7dd3fc;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: rgba(11, 25, 44, 0.9);
-  padding: 1px 7px;
-  border-radius: 999px;
-  white-space: nowrap;
-  z-index: 7;
-}
-
-.turn-timer-text {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  z-index: 8;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: var(--gold);
-  background: #0f172a;
-  border: 1.5px solid var(--gold);
-  padding: 1px 6px;
-  border-radius: 999px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
-}
-
-.turn-timer-text.urgent {
-  color: #fff;
-  background: var(--red);
-  border-color: #fff;
-}
-
-.dealer-chip {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 23px;
-  height: 23px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 70%, #94a3b8 100%);
-  color: #0f172a;
-  font-weight: 900;
-  font-size: 0.72rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--gold);
-  z-index: 8;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
-}
-
-.bet-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(10, 20, 36, 0.92);
-  border: 1px solid rgba(245, 185, 66, 0.8);
-  color: #fef08a;
-  font-size: 0.74rem;
-  font-weight: 800;
-  padding: 2px 9px 2px 6px;
-  border-radius: 999px;
-  white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.55);
-}
-
-.mini-chip {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #f59e0b, #b45309);
-  border: 1.5px dashed #fef08a;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* ================= HUD FLUTUANTE INFERIOR (COMANDOS NO CANTO INFERIOR DIREITO) ================= */
-.controls-hud {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding:
-    0
-    max(14px, env(safe-area-inset-right))
-    max(10px, env(safe-area-inset-bottom))
-    max(14px, env(safe-area-inset-left));
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 0.8rem;
-  pointer-events: none;
-  z-index: 25;
-}
-
-.hud-bottom-left {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  pointer-events: none;
-}
-
-.table-quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  pointer-events: auto;
-}
-
-.hand-strength {
-  font-size: 0.84rem;
-  color: var(--gold);
-  font-weight: 700;
-  background: rgba(7, 19, 33, 0.88);
-  border: 1px solid rgba(245, 185, 66, 0.4);
-  padding: 0.3rem 0.85rem;
-  border-radius: 999px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-  white-space: nowrap;
-}
-
-.action-dock {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.45rem;
-  background: rgba(8, 20, 36, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(125, 211, 252, 0.25);
-  border-radius: 15px;
-  padding: 0.5rem 0.6rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
-  transition: opacity 0.2s ease;
-}
-
-.action-dock.disabled {
-  opacity: 0.36;
-  pointer-events: none;
-}
-
-.raise-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  transition: opacity 0.15s ease;
-}
-
-.raise-row.disabled-raise {
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.quick-bet-group {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.btn-quick {
-  background: rgba(19, 40, 66, 0.95);
-  border: 1px solid rgba(125, 211, 252, 0.32);
-  color: #bae6fd;
-  border-radius: 7px;
-  padding: 0.22rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn-quick:active {
-  transform: scale(0.95);
-  background: rgba(56, 189, 248, 0.25);
-}
-
-#raise-slider {
-  flex: 1;
-  min-width: 115px;
-  accent-color: var(--ice-cyan);
-  cursor: pointer;
-}
-
-.main-action-row {
-  display: flex;
-  align-items: center;
-  gap: 0.42rem;
-}
-
-.main-action-row .btn {
-  padding: 0.58rem 0.9rem;
-  font-size: 0.86rem;
-  white-space: nowrap;
-}
-
-.btn-fold { background: linear-gradient(180deg, #ef4444, #b91c1c); }
-.btn-call { background: linear-gradient(180deg, #22c55e, #15803d); min-width: 92px; }
-.btn-raise { background: linear-gradient(180deg, #3b82f6, #1d4ed8); min-width: 102px; }
-.btn-allin { background: linear-gradient(180deg, #8b5cf6, #6d28d9); }
-
-/* ================= BOTÃO INSTALAR PWA E MODAL IOS ================= */
-.btn-install {
-  margin-top: 0.75rem;
-  width: 100%;
-  background: linear-gradient(135deg, #0d9488, #0f766e);
-  border: 1px solid rgba(94, 234, 212, 0.35);
-  color: #f0fdfa;
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(3, 10, 20, 0.8);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  z-index: 100;
-}
-
-.modal-box {
-  background: linear-gradient(165deg, #102742, #081526);
-  border: 1.5px solid var(--ice-cyan);
-  border-radius: 18px;
-  padding: 1.5rem;
-  max-width: 360px;
-  width: 100%;
-  text-align: center;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 28px rgba(56, 189, 248, 0.25);
-}
-
-.modal-box h3 {
-  color: #bae6fd;
-  margin-bottom: 1rem;
-}
-
-.ios-steps {
-  text-align: left;
-  padding-left: 1.2rem;
-  margin-bottom: 1.3rem;
-  color: var(--text-main);
-  font-size: 0.9rem;
-  line-height: 1.55;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-/* ================= PORTRAIT / ECRÃS ESTREITOS ================= */
-@media (max-width: 780px) and (orientation: portrait) {
-  .lobby-card {
-    padding: 1.4rem 1.25rem;
-  }
-  .lobby-logo {
-    width: 92px;
-    height: 92px;
-  }
-  .table-area {
-    padding: 4rem 2.2rem 9.5rem;
-  }
-  .poker-table {
-    width: 76vw;
-    height: 40dvh;
-    border-width: 10px;
-  }
-  .table-betting-line {
-    inset: 12px 16px;
-  }
-  .dealer-avatar-wrap {
-    width: 52px;
-    height: 52px;
-  }
-  .winning-hand-banner {
-    font-size: 0.95rem;
-    padding: 0.22rem 1.4rem;
-    letter-spacing: 1.5px;
-  }
-  .seat {
-    width: 82px;
-  }
-  .seat-ring {
-    width: 56px;
-    height: 56px;
-  }
-  .seat.is-me .seat-ring {
-    width: 64px;
-    height: 64px;
-  }
-  .hero-cards .card {
-    width: 40px;
-    height: 56px;
-  }
-  .seat.is-me.has-cards .seat-chips {
-    margin-top: 24px;
-  }
-  .seat-name {
-    font-size: 0.66rem;
-  }
-  .seat-chips {
-    font-size: 0.68rem;
-    padding: 1px 7px;
-  }
-  .card {
-    width: 42px;
-    height: 60px;
-    padding: 2px 3px;
-  }
-  .card-rank {
-    font-size: 0.72rem;
-  }
-  .card-center {
-    font-size: 1.15rem;
-  }
-  .card.small {
-    width: 22px;
-    height: 32px;
-  }
-  .dealer-speech {
-    font-size: 0.66rem;
-  }
-  .controls-hud {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.4rem;
-    padding: 0 8px max(8px, env(safe-area-inset-bottom)) 8px;
-  }
-  .hud-bottom-left {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .action-dock {
-    width: 100%;
-    padding: 0.45rem 0.5rem;
-  }
-  .main-action-row {
-    display: grid;
-    grid-template-columns: 0.85fr 1.1fr 1.15fr 0.9fr;
-    gap: 0.35rem;
-  }
-  .main-action-row .btn {
-    padding: 0.55rem 0.35rem;
-    font-size: 0.78rem;
-    min-width: 0;
-  }
-}
-
-/* ================= MOBILE HORIZONTAL — ESQUEMA COMPACTO ZYNGA POKER ================= */
-@media (orientation: landscape) and (max-height: 540px) {
-  /* Lobby em 2 colunas sem scroll */
-  #lobby-screen {
-    padding:
-      max(0.5rem, env(safe-area-inset-top))
-      max(1rem, env(safe-area-inset-right))
-      max(0.5rem, env(safe-area-inset-bottom))
-      max(1rem, env(safe-area-inset-left));
-  }
-
-  .lobby-card {
-    display: grid;
-    grid-template-columns: 0.85fr 1.15fr;
-    align-items: center;
-    gap: 1.2rem;
-    max-width: 680px;
-    padding: 0.95rem 1.35rem;
-  }
-
-  .lobby-logo {
-    width: 78px;
-    height: 78px;
-    border-radius: 16px;
-  }
-
-  .brand h1 {
-    font-size: 1.45rem;
-    letter-spacing: 2px;
-  }
-
-  .brand-suit {
-    font-size: 1.15rem;
-  }
-
-  .subtitle {
-    font-size: 0.76rem;
-    margin: 0.2rem 0 0;
-  }
-
-  .form-group {
-    margin-bottom: 0.55rem;
-  }
-
-  .form-group label {
-    font-size: 0.72rem;
-    margin-bottom: 0.2rem;
-  }
-
-  input[type="text"] {
-    padding: 0.48rem 0.75rem;
-    font-size: 0.86rem;
-  }
-
-  .divider {
-    margin: 0.5rem 0;
-    font-size: 0.66rem;
-  }
-
-  .lobby-form-col .btn {
-    padding: 0.5rem 0.9rem;
-    font-size: 0.82rem;
-  }
-
-  .btn-install {
-    margin-top: 0.45rem;
-  }
-
-  .error-msg {
-    margin-top: 0.35rem;
-    font-size: 0.74rem;
-    min-height: 0.9rem;
-  }
-
-  /* Barra Superior compacta (quando fora de Fullscreen) */
-  .top-bar {
-    padding:
-      max(0.2rem, env(safe-area-inset-top))
-      max(0.75rem, env(safe-area-inset-right))
-      0.2rem
-      max(0.75rem, env(safe-area-inset-left));
-    min-height: 34px;
-  }
-
-  .top-left,
-  .top-center,
-  .top-right {
-    gap: 0.4rem;
-  }
-
-  .logo-mini {
-    font-size: 0.8rem;
-    letter-spacing: 1px;
-  }
-
-  .badge {
-    font-size: 0.62rem;
-    padding: 0.12rem 0.4rem;
-  }
-
-  .top-center {
-    font-size: 0.74rem;
-  }
-
-  .btn-tiny {
-    padding: 0.14rem 0.42rem;
-    font-size: 0.66rem;
-  }
-
-  .btn-icon {
-    padding: 0.24rem 0.48rem;
-    font-size: 0.8rem;
-  }
-
-  .btn-sm {
-    padding: 0.26rem 0.64rem;
-    font-size: 0.72rem;
-  }
-
-  /* MESA COMPACTA E CENTRADA COMO NA ZYNGA POKER */
-  .table-area {
-    padding:
-      28px
-      max(76px, env(safe-area-inset-right))
-      80px
-      max(76px, env(safe-area-inset-left));
-  }
-
-  body.is-fullscreen .table-area {
-    padding:
-      34px
-      max(84px, env(safe-area-inset-right))
-      86px
-      max(84px, env(safe-area-inset-left));
-  }
-
-  .poker-table {
-    width: min(500px, 58vw);
-    height: min(195px, 49dvh);
-    border-width: 11px;
-    border-radius: 120px;
-    box-shadow:
-      inset 0 0 0 1.5px rgba(253, 224, 71, 0.42),
-      inset 0 0 42px rgba(0, 0, 0, 0.72),
-      0 0 0 3px var(--rail-outer),
-      0 0 0 5px rgba(245, 185, 66, 0.16),
-      0 14px 36px rgba(0, 0, 0, 0.85);
-  }
-
-  body.is-fullscreen .poker-table {
-    width: min(535px, 60vw);
-    height: min(210px, 53dvh);
-    border-width: 12px;
-    border-radius: 130px;
-  }
-
-  .table-betting-line {
-    inset: 11px 16px;
-    border-radius: 105px;
-  }
-
-  .table-watermark {
-    bottom: 13%;
-    font-size: 0.58rem;
-    letter-spacing: 3px;
-  }
-
-  /* Dealer no topo */
-  .dealer-seat {
-    top: -10%;
-    transform: translate(-50%, -34%);
-  }
-
-  .dealer-avatar-wrap {
-    width: 46px;
-    height: 46px;
-    border-width: 2px;
-  }
-
-  .dealer-plate {
-    margin-top: -8px;
-    padding: 0.08rem 0.55rem;
-    gap: 0.25rem;
-  }
-
-  .dealer-tag,
-  .next-hand-pill {
-    font-size: 0.54rem;
-  }
-
-  .dealer-speech {
-    margin-top: 2px;
-    font-size: 0.6rem;
-    padding: 0.1rem 0.58rem;
-    max-width: 280px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .waiting-room-pill {
-    margin-top: 3px;
-    font-size: 0.62rem;
-    padding: 0.1rem 0.5rem;
-  }
-
-  /* Centro do feltro */
-  .table-center {
-    gap: 0.22rem;
-    margin-top: 0.65rem;
-  }
-
-  .pot-zone {
-    min-height: 20px;
-    gap: 0.4rem;
-  }
-
-  .pot-chips {
-    height: 18px;
-    gap: 3px;
-  }
-
-  .poker-chip {
-    width: 13px;
-    height: 5px;
-    margin-top: -2px;
-  }
-
-  .pot-display {
-    padding: 0.12rem 0.64rem;
-    font-size: 0.74rem;
-  }
-
-  .pot-label {
-    font-size: 0.54rem;
-  }
-
-  .side-pot-tag {
-    font-size: 0.54rem;
-    padding: 1px 6px;
-  }
-
-  .community-cards {
-    gap: 0.34rem;
-    min-height: 56px;
-  }
-
-  .winning-hand-banner {
-    margin-top: 0;
-    padding: 0.14rem 1.2rem;
-    font-size: 0.8rem;
-    letter-spacing: 1.5px;
-  }
-
-  /* Cartas Comunitárias */
-  .card {
-    width: 40px;
-    height: 56px;
-    padding: 2px 3px;
-    border-radius: 6px;
-  }
-
-  .card-corner {
-    width: 11px;
-  }
-
-  .card-rank {
-    font-size: 0.68rem;
-  }
-
-  .card-suit-mini {
-    font-size: 0.5rem;
-  }
-
-  .card-center {
-    font-size: 1.12rem;
-  }
-
-  .card.back {
-    padding: 2px;
-  }
-
-  .card-back-emblem {
-    font-size: 0.76rem;
-  }
-
-  .community-cards .card.card-win {
-    transform: translateY(-4px) scale(1.06);
-  }
-
-  /* Mini cartas dos adversários (estilo Zynga) */
-  .card.small {
-    width: 21px;
-    height: 30px;
-    padding: 1.5px;
-    border-radius: 4px;
-  }
-
-  .card.small .card-corner {
-    width: 7px;
-  }
-
-  .card.small .card-rank {
-    font-size: 0.46rem;
-  }
-
-  .card.small .card-suit-mini {
-    font-size: 0.36rem;
-  }
-
-  .card.small .card-center {
-    font-size: 0.66rem;
-  }
-
-  .card.small .card-back-emblem {
-    font-size: 0.48rem;
-  }
-
-  .opp-cards .card:first-child {
-    margin-right: -6px;
-  }
-
-  .opp-cards.revealed .card {
-    width: 34px;
-    height: 48px;
-    padding: 2px;
-    border-radius: 5px;
-  }
-
-  .opp-cards.revealed .card-rank {
-    font-size: 0.6rem;
-  }
-
-  .opp-cards.revealed .card-suit-mini {
-    font-size: 0.45rem;
-  }
-
-  .opp-cards.revealed .card-center {
-    font-size: 0.95rem;
-  }
-
-  /* Cartas do Herói na metade inferior da frente do círculo */
-  .hero-cards {
-    top: 46%;
-  }
-
-  .hero-cards .card {
-    width: 38px;
-    height: 52px;
-    padding: 2px 3px;
-    border-radius: 6px;
-  }
-
-  .hero-cards .card:first-child {
-    margin-right: -8px;
-  }
-
-  .hero-cards .card-rank {
-    font-size: 0.66rem;
-  }
-
-  .hero-cards .card-suit-mini {
-    font-size: 0.48rem;
-  }
-
-  .hero-cards .card-center {
-    font-size: 1.02rem;
-  }
-
-  /* 5 Lugares Zynga em Horizontal */
-  .seat {
-    width: 76px;
-  }
-
-  .seat-0 { left: 50%; top: 100%; }
-  .seat-1 { left: 2%;  top: 74%;  }
-  .seat-2 { left: 19%; top: -4%;  }
-  .seat-3 { left: 81%; top: -4%;  }
-  .seat-4 { left: 98%; top: 74%;  }
-
-  /* 6 Lugares em Horizontal */
-  .poker-table.six-players .seat-0 { left: 32%; top: 100%; }
-  .poker-table.six-players .seat-1 { left: -3%; top: 52%;  }
-  .poker-table.six-players .seat-2 { left: 19%; top: -4%;  }
-  .poker-table.six-players .seat-3 { left: 81%; top: -4%;  }
-  .poker-table.six-players .seat-4 { left: 103%; top: 52%; }
-  .poker-table.six-players .seat-5 { left: 68%; top: 100%; }
-
-  .seat-ring {
-    width: 48px;
-    height: 48px;
-    padding: 2.5px;
-  }
-
-  .seat.is-me .seat-ring {
-    width: 56px;
-    height: 56px;
-  }
-
-  .seat.empty .seat-ring {
-    width: 40px;
-    height: 40px;
-  }
-
-  .seat-empty-label {
-    font-size: 0.56rem;
-  }
-
-  .seat.is-me.has-cards .seat-circle {
-    padding-top: 5px;
-  }
-
-  .seat.is-me.has-cards .seat-chips {
-    margin-top: 23px;
-  }
-
-  .seat-0 .hero-bet-zone {
-    bottom: calc(100% + 9px);
-  }
-
-  .seat-felt-zone {
-    gap: 4px;
-  }
-
-  .seat-1 .seat-felt-zone {
-    left: 92%;
-    top: 20%;
-  }
-
-  .seat-2 .seat-felt-zone,
-  .seat-3 .seat-felt-zone {
-    top: 108%;
-  }
-
-  .seat-4 .seat-felt-zone {
-    right: 92%;
-    top: 20%;
-  }
-
-  .seat.active-turn .seat-ring,
-  .seat.is-winner .seat-ring {
-    padding: 3px;
-  }
-
-  .seat-circle {
-    padding: 3px;
-  }
-
-  .seat-name {
-    font-size: 0.62rem;
-  }
-
-  .seat-you-tag {
-    font-size: 0.44rem;
-    margin-top: 1px;
-  }
-
-  .winner-badge {
-    top: -8px;
-    font-size: 0.5rem;
-    padding: 1px 6px;
-  }
-
-  .seat-chips {
-    margin-top: 3px;
-    font-size: 0.62rem;
-    padding: 1px 7px;
-  }
-
-  .seat-status {
-    margin-top: 1px;
-    font-size: 0.5rem;
-    padding: 1px 5px;
-  }
-
-  .dealer-chip {
-    width: 17px;
-    height: 17px;
-    font-size: 0.56rem;
-    top: -3px;
-    right: -3px;
-  }
-
-  .turn-timer-text {
-    font-size: 0.54rem;
-    padding: 0 4px;
-    top: -4px;
-    left: -4px;
-  }
-
-  .bet-pill {
-    font-size: 0.58rem;
-    padding: 1px 6px 1px 4px;
-    gap: 3px;
-  }
-
-  .mini-chip {
-    width: 8px;
-    height: 8px;
-  }
-
-  /* HUD compacto no canto inferior direito */
-  .controls-hud {
-    padding:
-      0
-      max(8px, env(safe-area-inset-right))
-      max(6px, env(safe-area-inset-bottom))
-      max(10px, env(safe-area-inset-left));
-  }
-
-  .hand-strength {
-    font-size: 0.66rem;
-    padding: 0.2rem 0.64rem;
-  }
-
-  .action-dock {
-    padding: 0.3rem 0.4rem;
-    gap: 0.28rem;
-    border-radius: 12px;
-  }
-
-  .raise-row {
-    gap: 0.32rem;
-  }
-
-  .btn-quick {
-    padding: 0.14rem 0.38rem;
-    font-size: 0.62rem;
-    border-radius: 6px;
-  }
-
-  #raise-slider {
-    min-width: 82px;
-    height: 18px;
-  }
-
-  .main-action-row {
-    gap: 0.28rem;
-  }
-
-  .main-action-row .btn {
-    min-height: 34px;
-    padding: 0.34rem 0.56rem;
-    font-size: 0.74rem;
-    border-radius: 8px;
-  }
-
-  .btn-fold { min-width: 54px; }
-  .btn-call { min-width: 78px; }
-  .btn-raise { min-width: 82px; }
-  .btn-allin { min-width: 56px; }
-}
-
-/* Ajuste fino extra para ecrãs Android muito baixos (<= 365px altura) */
-@media (orientation: landscape) and (max-height: 365px) {
-  body.is-fullscreen .table-area {
-    padding-top: 30px;
-    padding-bottom: 74px;
-  }
-  body.is-fullscreen .poker-table {
-    height: 49dvh;
-  }
-  .dealer-avatar-wrap {
-    width: 40px;
-    height: 40px;
-  }
-  .seat-ring {
-    width: 42px;
-    height: 42px;
-  }
-  .seat.is-me .seat-ring {
-    width: 50px;
-    height: 50px;
-  }
-  .hero-cards .card {
-    width: 34px;
-    height: 46px;
-  }
-  .seat.is-me.has-cards .seat-chips {
-    margin-top: 19px;
-  }
-  .main-action-row .btn {
-    min-height: 30px;
-    padding: 0.28rem 0.48rem;
-    font-size: 0.7rem;
-  }
-  /* ============================================================================
-   MESA 3D INCLINADA + FITA LED DINÂMICA (ESTILO ZYNGA)
-   ============================================================================ */
-:root {
-  --led-core: #38bdf8;
-  --led-bright: #bae6fd;
-  --led-glow-soft: rgba(56, 189, 248, 0.42);
-}
-
-/* Remove o aspeto 2D plano da caixa base (a mesa visível passa a ser .table-3d-body) */
-.poker-table {
   width: min(740px, 66vw);
-  height: min(320px, 43dvh);
-  background: none !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  height: min(320px, 44dvh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .table-3d-stage {
@@ -2148,22 +472,18 @@ body.is-fullscreen #game-screen #btn-leave {
     radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.1) 0%, transparent 56%),
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.014) 0px, rgba(255, 255, 255, 0.014) 2px, transparent 2px, transparent 4px),
     radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 60%, var(--felt-edge) 100%);
-  border: 17px solid #593823;
+  border: 17px solid var(--rail-inner);
   box-shadow:
-    /* Espessura 3D real da borda da mesa */
     0 5px 0 #3d2415,
     0 10px 0 #2b180e,
     0 15px 0 #1b0f08,
-    /* Sombra no chão + reflexo difuso da fita LED */
     0 26px 56px rgba(0, 0, 0, 0.88),
     0 14px 36px var(--led-glow-soft),
-    /* Profundidade interior + brilho LED no feltro */
     inset 0 0 60px rgba(0, 0, 0, 0.72),
     inset 0 0 26px var(--led-glow-soft);
   transition: box-shadow 0.65s ease;
 }
 
-/* Fita LED embutida por baixo do rebordo interior da mesa */
 .table-led-strip {
   position: absolute;
   inset: 2px;
@@ -2180,288 +500,485 @@ body.is-fullscreen #game-screen #btn-leave {
   animation: ledBreathe 3.2s ease-in-out infinite alternate;
 }
 
-@keyframes ledBreathe {
-  0% { opacity: 0.82; }
-  100% { opacity: 1; }
-}
+@keyframes ledBreathe { 0% { opacity: 0.82; } 100% { opacity: 1; } }
 
-/* Linha de apostas e marca d'água acompanham a inclinação 3D do feltro */
-.table-3d-body .table-betting-line {
+.table-betting-line {
+  position: absolute;
   inset: 22px 30px;
   border-radius: 185px;
   border: 1.5px solid rgba(253, 224, 71, 0.25);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
   z-index: 1;
 }
 
-.table-3d-body .table-watermark {
+.table-watermark {
+  position: absolute;
   bottom: 14%;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 0.88rem;
+  font-weight: 900;
   letter-spacing: 5px;
   color: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  white-space: nowrap;
   z-index: 1;
 }
 
-/* Ajuste de lugares à perspetiva trapezoidal (topo mais estreito, base mais larga) */
+/* ================= DEALER E CENTRO DO FELTRO ================= */
 .dealer-seat {
+  position: absolute;
+  left: 50%;
   top: -8%;
   transform: translate(-50%, -38%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 6;
+  pointer-events: none;
 }
+
+.dealer-avatar-wrap {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.75), 0 0 18px rgba(245, 185, 66, 0.38);
+  overflow: hidden;
+  background: #071321;
+}
+
+.dealer-svg { width: 100%; height: 100%; display: block; }
+
+.dealer-plate {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: -12px;
+  background: linear-gradient(180deg, #1e293b, #0f172a);
+  border: 1.5px solid var(--gold);
+  padding: 0.16rem 0.85rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
+  z-index: 2;
+}
+
+.dealer-tag { font-size: 0.68rem; font-weight: 800; letter-spacing: 1.8px; color: var(--gold); }
+.next-hand-pill { background: var(--gold); color: #0f172a; font-weight: 800; font-size: 0.66rem; padding: 0.08rem 0.42rem; border-radius: 999px; }
+
+.dealer-speech {
+  margin-top: 5px;
+  background: rgba(7, 19, 33, 0.88);
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  color: #e2e8f0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.2rem 0.82rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.waiting-room-pill {
+  margin-top: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(10, 26, 46, 0.94);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #bae6fd;
+  font-size: 0.72rem;
+  padding: 0.18rem 0.62rem;
+  border-radius: 999px;
+  pointer-events: auto;
+}
+
+.table-center { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; z-index: 3; margin-top: 0.4rem; position: relative; }
+.pot-zone { display: flex; align-items: center; justify-content: center; gap: 0.65rem; min-height: 30px; }
+.pot-chips { display: flex; align-items: flex-end; gap: 5px; height: 28px; }
+.chip-stack { display: flex; flex-direction: column-reverse; align-items: center; }
+
+.poker-chip {
+  width: 20px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.88);
+  margin-top: -3px;
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.35), 0 2px 4px rgba(0, 0, 0, 0.65);
+}
+
+.chip-500 { background: linear-gradient(90deg, #6d28d9, #8b5cf6, #5b21b6); }
+.chip-100 { background: linear-gradient(90deg, #0f172a, #334155, #0f172a); }
+.chip-25  { background: linear-gradient(90deg, #15803d, #22c55e, #14532d); }
+.chip-10  { background: linear-gradient(90deg, #1d4ed8, #3b82f6, #1e3a8a); }
+.chip-5   { background: linear-gradient(90deg, #b91c1c, #ef4444, #991b1b); }
+
+.pot-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(7, 15, 28, 0.94));
+  border: 1.5px solid rgba(245, 185, 66, 0.65);
+  padding: 0.24rem 0.92rem;
+  border-radius: 999px;
+  font-weight: 800;
+  color: var(--gold);
+  font-size: 0.94rem;
+}
+
+.pot-label { font-size: 0.65rem; color: var(--text-muted); letter-spacing: 1.2px; }
+.side-pots-display { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem; }
+.side-pot-tag { background: rgba(7, 19, 33, 0.84); border: 1px solid rgba(125, 211, 252, 0.4); color: #bae6fd; font-size: 0.64rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+.community-cards { display: flex; justify-content: center; gap: 0.5rem; min-height: 82px; align-items: center; }
+
+.winning-hand-banner {
+  margin-top: 2px;
+  padding: 0.28rem 2rem;
+  font-size: 1.18rem;
+  font-weight: 900;
+  letter-spacing: 2.2px;
+  color: #111827;
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0) 0%, rgba(251, 146, 60, 0.92) 22%, rgba(253, 224, 71, 0.98) 50%, rgba(251, 146, 60, 0.92) 78%, rgba(249, 115, 22, 0) 100%);
+  border-radius: 6px;
+  box-shadow: 0 0 24px rgba(251, 146, 60, 0.55);
+  animation: bannerPop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@keyframes bannerPop { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+
+/* ================= CARTAS HD ================= */
+.card {
+  width: 56px;
+  height: 80px;
+  background: linear-gradient(155deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 8px;
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 4px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  position: relative;
+  transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card.red { color: #dc2626; }
+.card-corner { display: flex; flex-direction: column; align-items: center; line-height: 0.92; width: 15px; }
+.card-corner.bottom { align-self: flex-end; transform: rotate(180deg); }
+.card-rank { font-size: 0.92rem; letter-spacing: -0.5px; }
+.card-suit-mini { font-size: 0.7rem; }
+.card-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.65rem; line-height: 1; }
+
+.card.back { background: linear-gradient(145deg, #f8fafc, #cbd5e1); padding: 2.5px; border: 1px solid rgba(255, 255, 255, 0.85); }
+.card-back-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  background:
+    repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
+    repeating-linear-gradient(-45deg, rgba(56, 189, 248, 0.12) 0px, rgba(56, 189, 248, 0.12) 3px, transparent 3px, transparent 7px),
+    radial-gradient(circle at center, #1d4ed8 0%, #0f172a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-back-emblem { color: rgba(186, 230, 253, 0.85); font-size: 1rem; text-shadow: 0 0 8px rgba(56, 189, 248, 0.85); }
+
+.card.small { width: 28px; height: 40px; padding: 2px; border-radius: 5px; }
+.card.small .card-corner { width: 9px; }
+.card.small .card-rank { font-size: 0.56rem; }
+.card.small .card-suit-mini { font-size: 0.44rem; }
+.card.small .card-center { font-size: 0.82rem; }
+.card.small .card-back-emblem { font-size: 0.62rem; }
+
+.card.card-win { border: 2.5px solid #fde047; box-shadow: 0 0 18px 4px rgba(251, 191, 36, 0.9), 0 0 8px 1px rgba(255, 255, 255, 0.85); z-index: 8 !important; }
+.community-cards .card.card-win { transform: translateY(-6px) scale(1.06); }
+.card.card-dim { filter: brightness(0.45) saturate(0.55); opacity: 0.82; }
+
+/* ================= LUGARES ZYNGA (5 LUGARES + 6 LUGARES) ================= */
+.seats-container { position: absolute; inset: 0; pointer-events: none; }
+.seat { position: absolute; width: 112px; transform: translate(-50%, -50%); pointer-events: auto; display: flex; flex-direction: column; align-items: center; transition: opacity 0.25s ease; }
 
 .seat-0 { left: 50%; top: 96%; }
 .seat-1 { left: 2%;  top: 72%; }
 .seat-2 { left: 23%; top: -2%; }
 .seat-3 { left: 77%; top: -2%; }
 .seat-4 { left: 98%; top: 72%; }
+.seat-5 { display: none; }
 
 .poker-table.six-players .seat-0 { left: 31%; top: 96%; }
 .poker-table.six-players .seat-1 { left: -3%; top: 52%; }
 .poker-table.six-players .seat-2 { left: 23%; top: -2%; }
 .poker-table.six-players .seat-3 { left: 77%; top: -2%; }
 .poker-table.six-players .seat-4 { left: 103%; top: 52%; }
-.poker-table.six-players .seat-5 { left: 69%; top: 96%; }
+.poker-table.six-players .seat-5 { display: flex; left: 69%; top: 96%; }
 
-/* Mobile Horizontal (Landscape) — Mesa compacta 3D com folga para HUD e Dealer */
-@media (orientation: landscape) and (max-height: 540px) {
-  .table-area {
-    padding:
-      26px
-      max(72px, env(safe-area-inset-right))
-      76px
-      max(72px, env(safe-area-inset-left));
-  }
+.seat-avatar-stack { position: relative; display: flex; flex-direction: column; align-items: center; }
 
-  body.is-fullscreen .table-area {
-    padding:
-      30px
-      max(78px, env(safe-area-inset-right))
-      80px
-      max(78px, env(safe-area-inset-left));
-  }
+.hero-cards { position: absolute; top: 48%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; z-index: 6; pointer-events: none; }
+.hero-cards .card { width: 52px; height: 74px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.72), 0 0 12px rgba(56, 189, 248, 0.25); }
+.hero-cards .card:first-child { transform: rotate(-10deg); margin-right: -11px; z-index: 1; }
+.hero-cards .card:last-child { transform: rotate(10deg); z-index: 2; }
+.seat.is-me.has-cards .seat-circle { justify-content: flex-start; padding-top: 9px; }
+.seat.is-me.has-cards .seat-chips { margin-top: 34px; }
+.seat-0 .hero-bet-zone { position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-50%); z-index: 5; pointer-events: none; }
 
-  .poker-table {
-    width: min(515px, 59vw);
-    height: min(182px, 46dvh);
-  }
+.seat-felt-zone { position: absolute; display: flex; align-items: center; justify-content: center; gap: 6px; z-index: 5; pointer-events: none; }
+.opp-cards { display: flex; align-items: center; justify-content: center; }
+.opp-cards .card:first-child { transform: rotate(-10deg); margin-right: -8px; z-index: 1; }
+.opp-cards .card:last-child { transform: rotate(10deg); z-index: 2; }
+.opp-cards.revealed .card { width: 48px; height: 68px; padding: 3px 4px; border-radius: 7px; }
+.opp-cards.revealed .card-rank { font-size: 0.78rem; }
+.opp-cards.revealed .card-center { font-size: 1.35rem; }
 
-  body.is-fullscreen .poker-table {
-    width: min(550px, 61vw);
-    height: min(195px, 49dvh);
-  }
+.seat-1 .seat-felt-zone { left: 96%; top: 22%; flex-direction: row; }
+.seat-2 .seat-felt-zone { top: 108%; left: 56%; transform: translateX(-50%); flex-direction: row-reverse; }
+.seat-3 .seat-felt-zone { top: 108%; left: 44%; transform: translateX(-50%); flex-direction: row; }
+.seat-4 .seat-felt-zone { right: 96%; top: 22%; flex-direction: row-reverse; }
+.poker-table.six-players .seat-1 .seat-felt-zone { left: 98%; top: 42%; transform: translateY(-50%); }
+.poker-table.six-players .seat-4 .seat-felt-zone { right: 98%; top: 42%; transform: translateY(-50%); }
+.poker-table.six-players .seat-5 .seat-felt-zone { bottom: 112%; left: 50%; transform: translateX(-50%); }
 
-  .table-3d-stage {
-    perspective: 540px;
-    perspective-origin: 50% 30%;
-  }
+.seat-ring {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(145deg, #3b5b82, #17273b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  z-index: 3;
+}
 
+.seat.is-me .seat-ring { width: 84px; height: 84px; background: linear-gradient(135deg, #7dd3fc, #0284c7); box-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 8px 20px rgba(0, 0, 0, 0.65); }
+.seat.active-turn .seat-ring { padding: 4px; box-shadow: 0 0 24px rgba(245, 185, 66, 0.68); }
+.seat.is-winner .seat-ring { background: linear-gradient(135deg, #fef08a, #f59e0b, #ea580c); padding: 4px; animation: winnerPulse 1.1s ease-in-out infinite alternate; }
+@keyframes winnerPulse {
+  0% { box-shadow: 0 0 18px 4px rgba(251, 191, 36, 0.75), 0 0 32px rgba(249, 115, 22, 0.5); }
+  100% { box-shadow: 0 0 28px 8px rgba(253, 224, 71, 0.95), 0 0 46px rgba(249, 115, 22, 0.75); }
+}
+
+.winner-badge { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #fef08a 0%, #f59e0b 100%); color: #111827; font-size: 0.64rem; font-weight: 900; letter-spacing: 1px; padding: 2px 9px; border-radius: 999px; border: 1.5px solid #fffbeb; z-index: 9; white-space: nowrap; }
+.seat-circle { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #1d3b5e 0%, #091525 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; text-align: center; overflow: hidden; }
+.seat.folded { opacity: 0.45; }
+.seat.empty .seat-ring { width: 56px; height: 56px; background: transparent; border: 1.5px dashed rgba(125, 211, 252, 0.25); box-shadow: none; }
+.seat.empty .seat-circle { background: rgba(16, 32, 51, 0.28); }
+.seat-empty-label { font-size: 0.68rem; color: rgba(148, 163, 184, 0.7); font-weight: 600; }
+.seat-name { font-weight: 800; font-size: 0.8rem; color: #f8fafc; line-height: 1.1; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seat-you-tag { font-size: 0.56rem; font-weight: 800; color: #38bdf8; letter-spacing: 1px; margin-top: 2px; }
+.seat-chips { margin-top: 6px; font-size: 0.82rem; color: #fff; font-weight: 800; background: rgba(7, 19, 33, 0.9); border: 1px solid rgba(245, 185, 66, 0.45); padding: 2px 10px; border-radius: 999px; white-space: nowrap; z-index: 7; }
+.seat.is-me .seat-chips { color: var(--gold); border-color: rgba(245, 185, 66, 0.65); }
+.seat-status { margin-top: 3px; font-size: 0.63rem; font-weight: 700; color: #7dd3fc; text-transform: uppercase; background: rgba(11, 25, 44, 0.9); padding: 1px 7px; border-radius: 999px; white-space: nowrap; z-index: 7; }
+
+.turn-timer-text { position: absolute; top: -6px; left: -6px; z-index: 8; font-size: 0.68rem; font-weight: 800; color: var(--gold); background: #0f172a; border: 1.5px solid var(--gold); padding: 1px 6px; border-radius: 999px; }
+.turn-timer-text.urgent { color: #fff; background: var(--red); border-color: #fff; }
+.dealer-chip { position: absolute; top: -4px; right: -4px; width: 23px; height: 23px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0%, #e2e8f0 70%, #94a3b8 100%); color: #0f172a; font-weight: 900; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; border: 2px solid var(--gold); z-index: 8; }
+.bet-pill { display: inline-flex; align-items: center; gap: 5px; background: rgba(10, 20, 36, 0.92); border: 1px solid rgba(245, 185, 66, 0.8); color: #fef08a; font-size: 0.74rem; font-weight: 800; padding: 2px 9px 2px 6px; border-radius: 999px; white-space: nowrap; }
+.mini-chip { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #f59e0b, #b45309); border: 1.5px dashed #fef08a; flex-shrink: 0; }
+
+/* ================= HUD FLUTUANTE (COMANDOS NO CANTO INFERIOR DIREITO) ================= */
+.controls-hud {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.8rem;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.hud-bottom-left { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; pointer-events: none; }
+.table-quick-actions { display: flex; align-items: center; gap: 0.45rem; pointer-events: auto; }
+.hand-strength { font-size: 0.84rem; color: var(--gold); font-weight: 700; background: rgba(7, 19, 33, 0.88); border: 1px solid rgba(245, 185, 66, 0.4); padding: 0.3rem 0.85rem; border-radius: 999px; white-space: nowrap; }
+
+.action-dock {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: rgba(8, 20, 36, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  border-radius: 15px;
+  padding: 0.5rem 0.6rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+}
+
+.action-dock.disabled { opacity: 0.36; pointer-events: none; }
+.raise-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.raise-row.disabled-raise { opacity: 0.38; pointer-events: none; }
+.quick-bet-group { display: flex; align-items: center; gap: 0.3rem; }
+.btn-quick { background: rgba(19, 40, 66, 0.95); border: 1px solid rgba(125, 211, 252, 0.32); color: #bae6fd; border-radius: 7px; padding: 0.22rem 0.5rem; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+#raise-slider { flex: 1; min-width: 115px; accent-color: var(--ice-cyan); cursor: pointer; }
+.main-action-row { display: flex; align-items: center; gap: 0.42rem; }
+.main-action-row .btn { padding: 0.58rem 0.9rem; font-size: 0.86rem; white-space: nowrap; }
+.btn-fold { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+.btn-call { background: linear-gradient(180deg, #22c55e, #15803d); min-width: 92px; }
+.btn-raise { background: linear-gradient(180deg, #3b82f6, #1d4ed8); min-width: 102px; }
+.btn-allin { background: linear-gradient(180deg, #8b5cf6, #6d28d9); }
+
+/* ================= MODAL IOS ================= */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(3, 10, 20, 0.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 100; }
+.modal-box { background: linear-gradient(165deg, #102742, #081526); border: 1.5px solid var(--ice-cyan); border-radius: 18px; padding: 1.4rem; max-width: 380px; width: 100%; text-align: center; }
+.modal-box h3 { color: #bae6fd; margin-bottom: 0.9rem; }
+.ios-steps { text-align: left; padding-left: 1.2rem; margin-bottom: 1.1rem; font-size: 0.88rem; line-height: 1.5; display: flex; flex-direction: column; gap: 0.45rem; }
+
+/* ================= TELEMÓVEL HORIZONTAL (ALTURA <= 540PX) ================= */
+@media (max-height: 540px) {
+  .lobby-card { gap: 1.1rem; max-width: 680px; padding: 0.85rem 1.25rem; }
+  .lobby-logo { width: 76px; height: 76px; border-radius: 16px; }
+  .brand h1 { font-size: 1.45rem; letter-spacing: 2px; }
+  .brand-suit { font-size: 1.15rem; }
+  .subtitle { font-size: 0.74rem; }
+  .auth-tabs { margin-bottom: 0.55rem; padding: 0.18rem; }
+  .auth-tab { padding: 0.36rem 0.5rem; font-size: 0.78rem; }
+  .form-group { margin-bottom: 0.5rem; }
+  .form-group label { font-size: 0.72rem; margin-bottom: 0.18rem; }
+  input[type="text"], input[type="password"] { padding: 0.46rem 0.72rem; font-size: 0.86rem; }
+  #auth-pin { font-size: 1rem; letter-spacing: 0.45rem; }
+  .divider { margin: 0.45rem 0; font-size: 0.64rem; }
+  .lobby-form-col .btn { padding: 0.48rem 0.85rem; font-size: 0.82rem; }
+  .user-profile-bar { padding: 0.4rem 0.6rem; margin-bottom: 0.5rem; }
+  .profile-username { font-size: 0.82rem; }
+  .profile-stats { font-size: 0.62rem; }
+  .profile-balance { font-size: 0.76rem; padding: 0.18rem 0.52rem; }
+  .error-msg { margin-top: 0.3rem; font-size: 0.72rem; min-height: 0.85rem; }
+
+  .top-bar { padding: max(0.2rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.2rem max(0.75rem, env(safe-area-inset-left)); min-height: 34px; }
+  .logo-mini { font-size: 0.78rem; letter-spacing: 1px; }
+  .badge { font-size: 0.6rem; padding: 0.12rem 0.4rem; }
+  .top-center { font-size: 0.72rem; }
+  .btn-tiny { padding: 0.14rem 0.42rem; font-size: 0.66rem; }
+  .btn-icon { padding: 0.24rem 0.48rem; font-size: 0.8rem; }
+  .btn-sm { padding: 0.26rem 0.64rem; font-size: 0.72rem; }
+
+  .table-area { padding: 26px max(72px, env(safe-area-inset-right)) 76px max(72px, env(safe-area-inset-left)); }
+  body.is-fullscreen .table-area { padding: 30px max(78px, env(safe-area-inset-right)) 80px max(78px, env(safe-area-inset-left)); }
+  .poker-table { width: min(515px, 59vw); height: min(182px, 46dvh); }
+  body.is-fullscreen .poker-table { width: min(550px, 61vw); height: min(195px, 49dvh); }
+
+  .table-3d-stage { perspective: 540px; perspective-origin: 50% 30%; }
   .table-3d-body {
     inset: -10% -2% 4% -2%;
     border-radius: 130px;
     border-width: 11px;
     transform: rotateX(29deg);
-    box-shadow:
-      0 3px 0 #3d2415,
-      0 6px 0 #2b180e,
-      0 9px 0 #1b0f08,
-      0 16px 34px rgba(0, 0, 0, 0.88),
-      0 10px 26px var(--led-glow-soft),
-      inset 0 0 42px rgba(0, 0, 0, 0.72),
-      inset 0 0 18px var(--led-glow-soft);
+    box-shadow: 0 3px 0 #3d2415, 0 6px 0 #2b180e, 0 9px 0 #1b0f08, 0 16px 34px rgba(0, 0, 0, 0.88), 0 10px 26px var(--led-glow-soft), inset 0 0 42px rgba(0, 0, 0, 0.72), inset 0 0 18px var(--led-glow-soft);
   }
+  .table-led-strip { inset: 1.5px; border-width: 2px; }
+  .table-betting-line { inset: 11px 16px; border-radius: 105px; }
+  .table-watermark { bottom: 12%; font-size: 0.56rem; letter-spacing: 3px; }
 
-  .table-led-strip {
-    inset: 1.5px;
-    border-width: 2px;
-  }
+  .dealer-seat { top: -6%; transform: translate(-50%, -34%); }
+  .dealer-avatar-wrap { width: 46px; height: 46px; border-width: 2px; }
+  .dealer-plate { margin-top: -8px; padding: 0.08rem 0.55rem; }
+  .dealer-tag, .next-hand-pill { font-size: 0.54rem; }
+  .dealer-speech { margin-top: 2px; font-size: 0.6rem; padding: 0.1rem 0.58rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+  .waiting-room-pill { margin-top: 3px; font-size: 0.62rem; padding: 0.1rem 0.5rem; }
 
-  .table-3d-body .table-betting-line {
-    inset: 11px 16px;
-    border-radius: 105px;
-  }
+  .table-center { gap: 0.22rem; margin-top: 0.55rem; }
+  .pot-zone { min-height: 20px; gap: 0.4rem; }
+  .pot-chips { height: 18px; gap: 3px; }
+  .poker-chip { width: 13px; height: 5px; margin-top: -2px; }
+  .pot-display { padding: 0.12rem 0.64rem; font-size: 0.74rem; }
+  .pot-label, .side-pot-tag { font-size: 0.54rem; }
+  .community-cards { gap: 0.34rem; min-height: 56px; }
+  .winning-hand-banner { padding: 0.14rem 1.2rem; font-size: 0.8rem; letter-spacing: 1.5px; }
 
-  .table-3d-body .table-watermark {
-    bottom: 12%;
-    font-size: 0.56rem;
-    letter-spacing: 3px;
-  }
+  .card { width: 40px; height: 56px; padding: 2px 3px; border-radius: 6px; }
+  .card-corner { width: 11px; }
+  .card-rank { font-size: 0.68rem; }
+  .card-suit-mini { font-size: 0.5rem; }
+  .card-center { font-size: 1.12rem; }
+  .card.back { padding: 2px; }
+  .card-back-emblem { font-size: 0.76rem; }
+  .community-cards .card.card-win { transform: translateY(-4px) scale(1.06); }
 
-  .dealer-seat {
-    top: -6%;
-    transform: translate(-50%, -34%);
-  }
+  .card.small { width: 21px; height: 30px; padding: 1.5px; border-radius: 4px; }
+  .card.small .card-corner { width: 7px; }
+  .card.small .card-rank { font-size: 0.46rem; }
+  .card.small .card-suit-mini { font-size: 0.36rem; }
+  .card.small .card-center { font-size: 0.66rem; }
+  .card.small .card-back-emblem { font-size: 0.48rem; }
+  .opp-cards .card:first-child { margin-right: -6px; }
+  .opp-cards.revealed .card { width: 34px; height: 48px; padding: 2px; border-radius: 5px; }
+  .opp-cards.revealed .card-rank { font-size: 0.6rem; }
+  .opp-cards.revealed .card-center { font-size: 0.95rem; }
 
-  .table-center {
-    margin-top: 0.55rem;
-  }
+  .hero-cards { top: 46%; }
+  .hero-cards .card { width: 38px; height: 52px; padding: 2px 3px; border-radius: 6px; }
+  .hero-cards .card:first-child { margin-right: -8px; }
+  .hero-cards .card-rank { font-size: 0.66rem; }
+  .hero-cards .card-suit-mini { font-size: 0.48rem; }
+  .hero-cards .card-center { font-size: 1.02rem; }
 
+  .seat { width: 76px; }
   .seat-0 { left: 50%; top: 94%; }
   .seat-1 { left: 0%;  top: 70%; }
   .seat-2 { left: 23%; top: -1%; }
   .seat-3 { left: 77%; top: -1%; }
   .seat-4 { left: 100%; top: 70%; }
-
   .poker-table.six-players .seat-0 { left: 31%; top: 94%; }
   .poker-table.six-players .seat-1 { left: -4%; top: 52%; }
-  .poker-table.six-players .seat-2 { left: 23%; top: -1%; }
-  .poker-table.six-players .seat-3 { left: 77%; top: -1%; }
   .poker-table.six-players .seat-4 { left: 104%; top: 52%; }
   .poker-table.six-players .seat-5 { left: 69%; top: 94%; }
+
+  .seat-ring { width: 48px; height: 48px; padding: 2.5px; }
+  .seat.is-me .seat-ring { width: 56px; height: 56px; }
+  .seat.empty .seat-ring { width: 40px; height: 40px; }
+  .seat-empty-label { font-size: 0.56rem; }
+  .seat.is-me.has-cards .seat-circle { padding-top: 5px; }
+  .seat.is-me.has-cards .seat-chips { margin-top: 23px; }
+  .seat-0 .hero-bet-zone { bottom: calc(100% + 9px); }
+  .seat-felt-zone { gap: 4px; }
+  .seat-1 .seat-felt-zone { left: 92%; top: 20%; }
+  .seat-4 .seat-felt-zone { right: 92%; top: 20%; }
+  .seat-circle { padding: 3px; }
+  .seat-name { font-size: 0.62rem; }
+  .seat-you-tag { font-size: 0.44rem; }
+  .winner-badge { top: -8px; font-size: 0.5rem; padding: 1px 6px; }
+  .seat-chips { margin-top: 3px; font-size: 0.62rem; padding: 1px 7px; }
+  .seat-status { margin-top: 1px; font-size: 0.5rem; padding: 1px 5px; }
+  .dealer-chip { width: 17px; height: 17px; font-size: 0.56rem; }
+  .turn-timer-text { font-size: 0.54rem; padding: 0 4px; }
+  .bet-pill { font-size: 0.58rem; padding: 1px 6px 1px 4px; gap: 3px; }
+  .mini-chip { width: 8px; height: 8px; }
+
+  .controls-hud { padding: 0 max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  .hand-strength { font-size: 0.66rem; padding: 0.2rem 0.64rem; }
+  .action-dock { padding: 0.3rem 0.4rem; gap: 0.28rem; border-radius: 12px; }
+  .btn-quick { padding: 0.14rem 0.38rem; font-size: 0.62rem; }
+  #raise-slider { min-width: 82px; height: 18px; }
+  .main-action-row { gap: 0.28rem; }
+  .main-action-row .btn { min-height: 34px; padding: 0.34rem 0.56rem; font-size: 0.74rem; border-radius: 8px; }
+  .btn-fold { min-width: 54px; }
+  .btn-call { min-width: 78px; }
+  .btn-raise { min-width: 82px; }
+  .btn-allin { min-width: 56px; }
 }
 
-@media (orientation: landscape) and (max-height: 365px) {
-  body.is-fullscreen .poker-table {
-    height: 45dvh;
-  }
+@media (max-height: 365px) {
+  body.is-fullscreen .table-area { padding-top: 28px; padding-bottom: 72px; }
+  body.is-fullscreen .poker-table { height: 45dvh; }
+  .dealer-avatar-wrap { width: 40px; height: 40px; }
+  .seat-ring { width: 42px; height: 42px; }
+  .seat.is-me .seat-ring { width: 50px; height: 50px; }
+  .hero-cards .card { width: 34px; height: 46px; }
+  .seat.is-me.has-cards .seat-chips { margin-top: 19px; }
+  .main-action-row .btn { min-height: 30px; padding: 0.28rem 0.48rem; font-size: 0.7rem; }
 }
 
-/* Mobile Vertical (Portrait) */
-@media (max-width: 780px) and (orientation: portrait) {
-  .poker-table {
-    width: 78vw;
-    height: 36dvh;
-  }
-  .table-3d-body {
-    border-width: 10px;
-    transform: rotateX(22deg);
-    box-shadow:
-      0 3px 0 #3d2415,
-      0 6px 0 #2b180e,
-      0 14px 30px rgba(0, 0, 0, 0.85),
-      0 8px 22px var(--led-glow-soft),
-      inset 0 0 36px rgba(0, 0, 0, 0.72),
-      inset 0 0 16px var(--led-glow-soft);
-  }
-}
-
-
-/* ============================================================================
-   SISTEMA DE UTILIZADORES E CARTEIRA (LOBBY GLACIAL)
-   ============================================================================ */
-.auth-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem;
-  background: rgba(4, 12, 24, 0.72);
-  border: 1px solid rgba(125, 211, 252, 0.22);
-  border-radius: 12px;
-  padding: 0.25rem;
-  margin-bottom: 1rem;
-}
-
-.auth-tab {
-  background: transparent;
-  border: none;
-  border-radius: 9px;
-  padding: 0.52rem 0.6rem;
-  color: #93c5fd;
-  font-weight: 700;
-  font-size: 0.86rem;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.auth-tab.active {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(2, 132, 199, 0.4));
-  color: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.45);
-}
-
-#auth-pin {
-  text-align: center;
-  letter-spacing: 0.65rem;
-  font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.auth-hint {
-  margin-top: 0.55rem;
-  font-size: 0.76rem;
-  color: #7dd3fc;
-}
-
-.user-profile-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6rem;
-  background: rgba(4, 15, 30, 0.82);
-  border: 1px solid rgba(125, 211, 252, 0.3);
-  border-radius: 14px;
-  padding: 0.62rem 0.8rem;
-  margin-bottom: 0.9rem;
-  text-align: left;
-}
-
-.user-profile-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.profile-username {
-  font-weight: 800;
-  font-size: 0.96rem;
-  color: #f0f9ff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.profile-stats {
-  font-size: 0.7rem;
-  color: #93c5fd;
-}
-
-.user-profile-right {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex-shrink: 0;
-}
-
-.profile-balance {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
-  border: 1.5px solid rgba(245, 185, 66, 0.75);
-  color: var(--gold);
-  font-weight: 900;
-  font-size: 0.88rem;
-  padding: 0.28rem 0.7rem;
-  border-radius: 999px;
-  white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
-}
-
-.btn-logout {
-  margin-left: 0;
-  background: rgba(220, 38, 38, 0.22);
-  border-color: rgba(248, 113, 113, 0.45);
-  color: #fecaca;
-}
-
-@media (orientation: landscape) and (max-height: 540px) {
-  .auth-tabs {
-    margin-bottom: 0.55rem;
-    padding: 0.18rem;
-  }
-  .auth-tab {
-    padding: 0.36rem 0.5rem;
-    font-size: 0.78rem;
-  }
-  #auth-pin {
-    font-size: 1rem;
-    letter-spacing: 0.45rem;
-  }
-  .user-profile-bar {
-    padding: 0.42rem 0.62rem;
-    margin-bottom: 0.55rem;
-  }
-  .profile-username {
-    font-size: 0.82rem;
-  }
-  .profile-stats {
-    font-size: 0.62rem;
-  }
-  .profile-balance {
-    font-size: 0.76rem;
-    padding: 0.18rem 0.55rem;
-  }
-}
+/* === FIM DO FICHEIRO style.css === */
