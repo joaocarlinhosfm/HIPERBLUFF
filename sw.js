@@ -1,4 +1,4 @@
-const CACHE_NAME = "hiperbluff-v4";
+const CACHE_NAME = "hiperbluff-v6";
 const ASSETS = [
   "./",
   "./index.html",
