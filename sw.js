@@ -1,4 +1,4 @@
-const CACHE_NAME = "hiperbluff-v20";
+const CACHE_NAME = "hiperbluff-v21";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -8,9 +8,9 @@ const CORE_ASSETS = [
   "./audio.js",
   "./poker.js",
   "./user.js",
-  "./bg-gelo.jpg", 
-  "./bg-ouro.jpg",
-  "./bg-vip.jpg",
+  "./bg-gelo.png", 
+  "./bg-ouro.png",
+  "./bg-vip.png",
   "./icon-192.png",
   "./icon-512.png",
   "./manifest.json",
