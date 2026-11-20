@@ -440,6 +440,7 @@ function normalizeRoomState(raw) {
     : Object.values(raw.players || {});
 
   return {
+    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
     hostId: raw.hostId || "",
     phase: raw.phase || "WAITING",
     pot: Number(raw.pot) || 0,
@@ -539,6 +540,8 @@ function generateRoomCode() {
 function createInitialRoom(hostId, hostName) {
   return {
     hostId,
+    tableLedIndex: pickNextLedIndex(),
+    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
     phase: "WAITING",
     pot: 0,
     currentBet: 0,
@@ -1223,6 +1226,7 @@ function renderCardHTML(card, hidden = false, small = false, highlightClass = ""
 
 function renderGame() {
   if (!roomState) return;
+   applyTableLedTheme(roomState.tableLedIndex);
 
   if (roomState.lastEvent && roomState.lastEvent.ts !== lastPlayedEventTs) {
     lastPlayedEventTs = roomState.lastEvent.ts;
