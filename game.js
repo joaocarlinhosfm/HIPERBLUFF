@@ -1,11 +1,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getDatabase, ref, set, get, onValue, update, remove,
+  runTransaction, onDisconnect, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { SoundEngine } from "./audio.js";
 import {
   MAX_PLAYERS, STARTING_CHIPS, BIG_BLIND, TURN_DURATION_MS, AUTO_START_DELAY_MS, LED_THEMES,
   cardKey, secureRandomInt, generateRoomCode, evaluateBestHand, buildSidePots,
   normalizeRoomState, createInitialRoom, setSoundEvent,
-  buildNewHandState, advancePhaseOnState, applyActionToState
+  buildNewHandState, advancePhaseOnState, applyActionToState, removePlayerFromState
 } from "./poker.js";
 import {
   INITIAL_BALANCE, initUserSystem, restoreSession, registerUser, loginUser,
@@ -30,6 +33,83 @@ if (isFirebaseConfigured) {
 
 const $ = (id) => document.getElementById(id);
 const on = (id, event, handler) => { const el = $(id); if (el) el.addEventListener(event, handler); };
+
+const PLAYER_ID_KEY = "hiperbluff_player_id";
+const ACTIVE_ROOM_KEY = "hiperbluff_active_room";
+const SETTLED_HAND_KEY = "hiperbluff_settled_hand";
+const HOST_MIGRATE_GRACE_MS = 6000;
+const DISCONNECT_REMOVE_GRACE_MS = 15000;
+
+function getOrCreatePlayerId() {
+  try {
+    let saved = sessionStorage.getItem(PLAYER_ID_KEY);
+    if (saved && /^p_[a-z0-9]{6,}$/.test(saved)) return saved;
+    saved = "p_" + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem(PLAYER_ID_KEY, saved);
+    return saved;
+  } catch (_) {
+    return "p_" + Math.random().toString(36).slice(2, 10);
+  }
+}
+
+function extractRoomCode(rawInput) {
+  const text = String(rawInput || "").trim();
+  if (!text) return "";
+  const match = text.match(/[?&]room=([a-z0-9]+)/i);
+  const candidate = match ? match[1] : text;
+  return candidate.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+}
+
+function getInviteCodeFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return extractRoomCode(params.get("room") || "");
+  } catch (_) {
+    return "";
+  }
+}
+
+function clearInviteFromURL() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("room")) {
+      url.searchParams.delete("room");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
+  } catch (_) {}
+}
+
+function buildInviteLink(code) {
+  try {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("room", code);
+    return url.toString();
+  } catch (_) {
+    return code;
+  }
+}
+
+function saveActiveRoomSession(code) {
+  const user = getCurrentUser();
+  try {
+    sessionStorage.setItem(ACTIVE_ROOM_KEY, JSON.stringify({
+      code,
+      playerId: myId,
+      userKey: user?.key || ""
+    }));
+  } catch (_) {}
+}
+
+function clearActiveRoomSession() {
+  try { sessionStorage.removeItem(ACTIVE_ROOM_KEY); } catch (_) {}
+}
+
+function getSavedActiveRoomSession() {
+  try { return JSON.parse(sessionStorage.getItem(ACTIVE_ROOM_KEY) || "null"); }
+  catch (_) { return null; }
+}
 
 function showScreen(screenId) {
   ["auth-screen", "hub-screen", "profile-screen", "game-screen"].forEach(id => {
@@ -69,15 +149,28 @@ function applyTableLedTheme(index) {
 }
 
 /* ============================================================================
-   2. ESTADO LOCAL, SINCRONIZAÇÃO, TIMERS E BOTS
+   2. ESTADO LOCAL, PRESENÇA ONLINE, TIMERS E BOTS
    ============================================================================ */
 let localMode = true;
-const myId = "p_" + Math.random().toString(36).slice(2, 8);
+const myId = getOrCreatePlayerId();
 let myName = "Jogador";
 let currentRoomCode = null;
 let roomState = null;
+let roomPresence = {};
 let unsubscribeRoom = null;
+let unsubscribeConnected = null;
+let myPresenceRef = null;
+let myOnDisconnectHandle = null;
+
 let isSyncingAction = false;
+let isLeavingRoom = false;
+let wasSeatedInRoom = false;
+let isMigratingHost = false;
+let isCleaningDisconnected = false;
+let pendingInviteCode = getInviteCodeFromURL();
+let hasHandledInitialAutoEntry = false;
+
+const offlineSinceMap = new Map();
 
 let timerInterval = null;
 let lastHandledTurnDeadline = 0;
@@ -90,6 +183,173 @@ let lastSliderTurnKey = "";
 let trackedHandId = 0;
 let handSettled = false;
 
+function isPlayerOffline(playerId) {
+  if (localMode || !playerId || playerId === myId) return false;
+  const entry = roomPresence?.[playerId];
+  return Boolean(entry && entry.online === false);
+}
+
+function updateOfflineTrackers() {
+  if (localMode || !roomState) {
+    offlineSinceMap.clear();
+    return;
+  }
+  const now = Date.now();
+  const activeIds = new Set(roomState.players.map(p => p.id));
+
+  for (const id of offlineSinceMap.keys()) {
+    if (!activeIds.has(id)) offlineSinceMap.delete(id);
+  }
+
+  for (const p of roomState.players) {
+    if (p.id === myId || p.isBot) {
+      offlineSinceMap.delete(p.id);
+      continue;
+    }
+    if (isPlayerOffline(p.id)) {
+      if (!offlineSinceMap.has(p.id)) offlineSinceMap.set(p.id, now);
+    } else {
+      offlineSinceMap.delete(p.id);
+    }
+  }
+}
+
+function pickPreferredOnlineHost(players, presence, excludeId = "") {
+  const candidates = (players || []).filter(p => p.id !== excludeId);
+  const online = candidates.find(p => presence?.[p.id]?.online === true);
+  if (online) return online.id;
+  const notOffline = candidates.find(p => presence?.[p.id]?.online !== false);
+  return (notOffline || candidates[0])?.id || "";
+}
+
+function detachPresence(removeNode = false) {
+  if (unsubscribeConnected) { unsubscribeConnected(); unsubscribeConnected = null; }
+  if (myOnDisconnectHandle) {
+    myOnDisconnectHandle.cancel().catch(() => {});
+    myOnDisconnectHandle = null;
+  }
+  if (removeNode && myPresenceRef) {
+    remove(myPresenceRef).catch(() => {});
+  }
+  myPresenceRef = null;
+}
+
+function attachPresence(code) {
+  detachPresence(false);
+  if (!db || !code) return;
+  myPresenceRef = ref(db, `rooms/${code}/presence/${myId}`);
+  const connectedRef = ref(db, ".info/connected");
+
+  unsubscribeConnected = onValue(connectedRef, async (snap) => {
+    if (snap.val() !== true || !myPresenceRef || currentRoomCode !== code || localMode || isLeavingRoom) return;
+    try {
+      const disc = onDisconnect(myPresenceRef);
+      myOnDisconnectHandle = disc;
+      await disc.set({ online: false, at: serverTimestamp() });
+      await set(myPresenceRef, { online: true, at: serverTimestamp() });
+    } catch (err) {
+      console.error("Erro ao configurar presença:", err);
+    }
+  });
+}
+
+async function claimHostViaTransaction(code) {
+  if (!db || !code || isMigratingHost || isLeavingRoom) return;
+  isMigratingHost = true;
+  try {
+    await runTransaction(ref(db, `rooms/${code}`), (raw) => {
+      if (!raw) return raw;
+      const prevPresence = raw.presence || {};
+      const state = normalizeRoomState(raw);
+      if (!state.players.some(p => p.id === myId)) return undefined;
+
+      const hostStillSeated = state.players.some(p => p.id === state.hostId);
+      const hostOnline = hostStillSeated && prevPresence[state.hostId]?.online !== false;
+      if (hostOnline) return undefined;
+
+      const nextHost = pickPreferredOnlineHost(state.players, prevPresence, "");
+      if (nextHost !== myId) return undefined;
+
+      state.hostId = myId;
+      state.presence = prevPresence;
+      return state;
+    });
+  } catch (err) {
+    console.error("Erro na migração de hostId:", err);
+  } finally {
+    isMigratingHost = false;
+  }
+}
+
+async function removePlayerFromRoomTx(code, targetPlayerId, reason = "saiu da mesa", onlyIfOffline = false) {
+  if (!db || !code || !targetPlayerId) return;
+  try {
+    await runTransaction(ref(db, `rooms/${code}`), (raw) => {
+      if (!raw) return raw;
+      const prevPresence = { ...(raw.presence || {}) };
+      if (onlyIfOffline && prevPresence[targetPlayerId]?.online === true) return undefined;
+
+      const state = normalizeRoomState(raw);
+      if (!state.players.some(p => p.id === targetPlayerId)) {
+        if (prevPresence[targetPlayerId]) {
+          delete prevPresence[targetPlayerId];
+          state.presence = Object.keys(prevPresence).length ? prevPresence : null;
+          return state;
+        }
+        return undefined;
+      }
+
+      const preferredHost = pickPreferredOnlineHost(state.players, prevPresence, targetPlayerId);
+      const next = removePlayerFromState(state, targetPlayerId, reason, preferredHost);
+      if (!next) return undefined;
+
+      if (next.players.length === 0) return null;
+
+      delete prevPresence[targetPlayerId];
+      next.presence = Object.keys(prevPresence).length ? prevPresence : null;
+      return next;
+    });
+  } catch (err) {
+    console.error("Erro ao remover jogador da sala:", err);
+  }
+}
+
+function checkOnlineStability() {
+  if (localMode || !roomState || !currentRoomCode || isLeavingRoom) return;
+  const now = Date.now();
+  const players = roomState.players || [];
+  if (!players.some(p => p.id === myId)) return;
+
+  // 1. Migração automática de hostId se o anfitrião sair ou cair
+  if (roomState.hostId !== myId) {
+    const hostSeated = players.some(p => p.id === roomState.hostId);
+    const hostOfflineSince = offlineSinceMap.get(roomState.hostId);
+    const hostTimedOut = !hostSeated || (hostOfflineSince && (now - hostOfflineSince) >= HOST_MIGRATE_GRACE_MS);
+
+    if (hostTimedOut && !isMigratingHost) {
+      const candidate = pickPreferredOnlineHost(players, roomPresence, hostSeated ? "" : roomState.hostId);
+      if (candidate === myId) {
+        claimHostViaTransaction(currentRoomCode);
+      }
+    }
+    return;
+  }
+
+  // 2. Limpeza de jogadores desligados pelo anfitrião após período de tolerância
+  if (isCleaningDisconnected) return;
+  const expiredPlayer = players.find(p => {
+    if (p.id === myId || p.isBot) return false;
+    const since = offlineSinceMap.get(p.id);
+    return since && (now - since) >= DISCONNECT_REMOVE_GRACE_MS;
+  });
+
+  if (expiredPlayer) {
+    isCleaningDisconnected = true;
+    removePlayerFromRoomTx(currentRoomCode, expiredPlayer.id, "desligou-se", true)
+      .finally(() => { isCleaningDisconnected = false; });
+  }
+}
+
 async function syncState(newState) {
   const clean = normalizeRoomState(newState);
   roomState = clean;
@@ -98,7 +358,7 @@ async function syncState(newState) {
     maybeTriggerBotTurn();
   } else if (db && currentRoomCode) {
     isSyncingAction = true;
-    try { await set(ref(db, `rooms/${currentRoomCode}`), clean); }
+    try { await update(ref(db, `rooms/${currentRoomCode}`), clean); }
     catch (err) { console.error("Erro ao sincronizar:", err); }
     finally { isSyncingAction = false; }
   }
@@ -159,11 +419,10 @@ async function performRebuy() {
   const rebuyAmount = user ? Math.min(STARTING_CHIPS, user.balance) : STARTING_CHIPS;
   if (rebuyAmount < BIG_BLIND) return;
 
-  const inActiveHand = roomState.phase !== "WAITING" && roomState.phase !== "SHOWDOWN";
-  const newStatus = inActiveHand ? "REBUY (PRÓX. MÃO)" : "REBUY";
-  const meName = roomState.players[myIdx].name;
-
   if (localMode) {
+    const inActiveHand = roomState.phase !== "WAITING" && roomState.phase !== "SHOWDOWN";
+    const newStatus = inActiveHand ? "REBUY (PRÓX. MÃO)" : "REBUY";
+    const meName = roomState.players[myIdx].name;
     const s = normalizeRoomState(structuredClone(roomState));
     s.players[myIdx].chips = rebuyAmount;
     s.players[myIdx].handStartChips = rebuyAmount;
@@ -179,21 +438,34 @@ async function performRebuy() {
     setSoundEvent(s, "chip");
     syncState(s);
   } else if (db && currentRoomCode) {
-    const updates = {
-      [`players/${myIdx}/chips`]: rebuyAmount,
-      [`players/${myIdx}/handStartChips`]: rebuyAmount,
-      [`players/${myIdx}/status`]: newStatus
-    };
-    if (!inActiveHand) {
-      updates[`players/${myIdx}/folded`] = false;
-      const aliveAfter = roomState.players.filter((pl, idx) => (idx === myIdx ? true : pl.chips > 0)).length;
-      if (roomState.phase === "SHOWDOWN" && aliveAfter >= 2 && roomState.nextHandDeadline === 0) {
-        updates["nextHandDeadline"] = Date.now() + 3000;
-        updates["message"] = `${meName} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
-      }
+    try {
+      await runTransaction(ref(db, `rooms/${currentRoomCode}`), (raw) => {
+        if (!raw) return raw;
+        const prevPresence = raw.presence || null;
+        const s = normalizeRoomState(raw);
+        const idx = s.players.findIndex(p => p.id === myId);
+        if (idx < 0 || s.players[idx].chips > 0) return undefined;
+
+        const inActiveHand = s.phase !== "WAITING" && s.phase !== "SHOWDOWN";
+        s.players[idx].chips = rebuyAmount;
+        s.players[idx].handStartChips = rebuyAmount;
+        s.players[idx].status = inActiveHand ? "REBUY (PRÓX. MÃO)" : "REBUY";
+        if (!inActiveHand) {
+          s.players[idx].folded = false;
+          const alive = s.players.filter(pl => pl.chips > 0).length;
+          if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
+            s.nextHandDeadline = Date.now() + 3000;
+            s.message = `${s.players[idx].name} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
+          }
+        }
+        setSoundEvent(s, "chip");
+        if (prevPresence) s.presence = prevPresence;
+        return s;
+      });
+      SoundEngine.chip();
+    } catch (err) {
+      console.error("Erro no Rebuy:", err);
     }
-    SoundEngine.chip();
-    await update(ref(db, `rooms/${currentRoomCode}`), updates);
   }
 }
 
@@ -224,6 +496,8 @@ function stopTimerLoop() { if (timerInterval) { clearInterval(timerInterval); ti
 
 function tickTimers() {
   if (!roomState) return;
+  checkOnlineStability();
+
   const now = Date.now();
   const isHost = roomState.hostId === myId;
 
@@ -289,7 +563,13 @@ function settleHandBalanceIfNeeded(forceLeave = false) {
   const handId = Number(roomState.handId) || 0;
   if (handId <= 0) return;
 
-  if (handId !== trackedHandId) { trackedHandId = handId; handSettled = false; }
+  const handKey = `${currentRoomCode || "OFFLINE"}_${handId}`;
+  if (handId !== trackedHandId) {
+    trackedHandId = handId;
+    let alreadySettled = false;
+    try { alreadySettled = sessionStorage.getItem(SETTLED_HAND_KEY) === handKey; } catch (_) {}
+    handSettled = alreadySettled;
+  }
   if (handSettled) return;
 
   const me = (roomState.players || []).find(p => p.id === myId);
@@ -299,6 +579,8 @@ function settleHandBalanceIfNeeded(forceLeave = false) {
   if (!isShowdown && !me.folded && !forceLeave) return;
 
   handSettled = true;
+  try { sessionStorage.setItem(SETTLED_HAND_KEY, handKey); } catch (_) {}
+
   const delta = me.chips - (Number(me.handStartChips) || 0);
   const won = isShowdown && (roomState.winnerIds || []).includes(myId);
   if (forceLeave && delta === 0) return;
@@ -363,7 +645,7 @@ function renderGame() {
   const sidePotsEl = $("side-pots-display");
   if (sidePotsEl) {
     const hasAllIn = players.some(p => !p.folded && p.allIn);
-    const sp = hasAllIn ? buildSidePots(players) : [];
+    const sp = hasAllIn ? buildSidePots(players, roomState.deadPot) : [];
     if (hasAllIn && sp.length > 1 && !isWaiting) {
       sidePotsEl.innerHTML = sp.map((x, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${x.amount}€</span>`).join("");
       sidePotsEl.classList.remove("hidden");
@@ -408,6 +690,7 @@ function renderGame() {
     const isMe = p.id === myId, isTurn = roomState.turnIndex === pIdx, isWinner = isShowdown && winnerIdsSet.has(p.id);
     const inHand = !p.folded && p.hand?.length === 2;
     const showCards = isMe || (roomState.isRunout && !p.folded) || (isShowdown && !p.folded && hasCardHighlights);
+    const statusLabel = isPlayerOffline(p.id) ? "OFFLINE..." : p.status;
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${inHand ? "has-cards" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
     const betPill = p.bet > 0 ? `<div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div>` : "";
@@ -421,12 +704,12 @@ function renderGame() {
       const heroCards = inHand ? `<div class="hero-cards">${p.hand.map(c =>
         renderCardHTML(c, false, false, hasCardHighlights ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
       ).join("")}</div>` : "";
-      el.innerHTML = `<div class="seat-avatar-stack">${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}<div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>${heroCards}</div><div class="seat-chips">${p.chips} €</div>${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
+      el.innerHTML = `<div class="seat-avatar-stack">${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}<div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>${heroCards}</div><div class="seat-chips">${p.chips} €</div>${statusLabel ? `<div class="seat-status">${statusLabel}</div>` : ""}`;
     } else {
       const oppCards = inHand ? `<div class="opp-cards ${showCards ? "revealed" : ""}">${p.hand.map(c =>
         renderCardHTML(c, !showCards, !showCards, (hasCardHighlights && showCards) ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
       ).join("")}</div>` : "";
-      el.innerHTML = `${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}<div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div><div class="seat-chips">${p.chips} €</div>${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
+      el.innerHTML = `${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}<div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div><div class="seat-chips">${p.chips} €</div>${statusLabel ? `<div class="seat-status">${statusLabel}</div>` : ""}`;
     }
   }
 
@@ -468,7 +751,7 @@ function renderGame() {
 }
 
 /* ============================================================================
-   4. AUTENTICAÇÃO, HUB DE CARDS, PERFIL E SALAS
+   4. AUTENTICAÇÃO, HUB DE CARDS, PERFIL E SALAS ONLINE
    ============================================================================ */
 function openGameScreen() {
   trackedHandId = 0; handSettled = false;
@@ -489,6 +772,23 @@ function getLoggedBuyInOrError() {
   return { name: user.username, buyIn: Math.min(STARTING_CHIPS, user.balance) };
 }
 
+function resetLocalRoomSession(notice = "") {
+  stopTimerLoop();
+  if (unsubscribeRoom) { unsubscribeRoom(); unsubscribeRoom = null; }
+  detachPresence(false);
+  clearActiveRoomSession();
+  roomState = null;
+  roomPresence = {};
+  currentRoomCode = null;
+  offlineSinceMap.clear();
+  wasMyTurn = false;
+  wasSeatedInRoom = false;
+  trackedHandId = 0;
+  handSettled = false;
+  showScreen(getCurrentUser() ? "hub-screen" : "auth-screen");
+  if (notice) showError(notice);
+}
+
 let authMode = "login";
 function setAuthMode(mode) {
   authMode = mode;
@@ -499,8 +799,27 @@ function setAuthMode(mode) {
   if ($("auth-error")) $("auth-error").textContent = "";
 }
 
+async function handlePostAuthAutoEntry(user) {
+  if (!isFirebaseConfigured || !db || !user) return;
+
+  if (pendingInviteCode) {
+    const invite = pendingInviteCode;
+    pendingInviteCode = "";
+    clearInviteFromURL();
+    if ($("room-code")) $("room-code").value = invite;
+    await joinOnlineRoom(invite, true);
+    return;
+  }
+
+  const saved = getSavedActiveRoomSession();
+  if (saved?.code && (!saved.userKey || saved.userKey === user.key)) {
+    await attemptReconnectToRoom(saved.code);
+  }
+}
+
 function renderAuthUI(user) {
   if (!user) {
+    hasHandledInitialAutoEntry = false;
     $("online-modal")?.classList.add("hidden");
     showScreen("auth-screen");
     return;
@@ -548,8 +867,12 @@ function renderAuthUI(user) {
   if ($("stat-biggest-win")) $("stat-biggest-win").textContent = formatEuro(user.biggestWin);
   if ($("stat-best-streak")) $("stat-best-streak").textContent = `Melhor série: ${user.bestStreak}`;
 
-  // Só muda de ecrã se estiver no login (não expulsa o jogador da mesa nem do perfil!)
   if (getActiveScreenId() === "auth-screen") showScreen("hub-screen");
+
+  if (!hasHandledInitialAutoEntry && getActiveScreenId() !== "game-screen") {
+    hasHandledInitialAutoEntry = true;
+    handlePostAuthAutoEntry(user);
+  }
 }
 
 async function handleAuthSubmit() {
@@ -575,7 +898,13 @@ on("tab-register", "click", () => setAuthMode("register"));
 on("auth-pin", "input", (e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); });
 on("btn-auth-submit", "click", handleAuthSubmit);
 on("auth-pin", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); handleAuthSubmit(); } });
-on("btn-logout", "click", () => { logoutUser(); setAuthMode("login"); });
+on("btn-logout", "click", () => {
+  clearActiveRoomSession();
+  try { sessionStorage.removeItem(SETTLED_HAND_KEY); } catch (_) {}
+  hasHandledInitialAutoEntry = false;
+  logoutUser();
+  setAuthMode("login");
+});
 
 // Navegação dos Cards do Hub
 const openOnlineModal = () => { SoundEngine.init(); showError(""); $("online-modal")?.classList.remove("hidden"); };
@@ -589,6 +918,10 @@ on("card-open-profile", "click", openProfile);
 on("hub-profile-trigger", "click", openProfile);
 on("btn-profile-back", "click", () => showScreen("hub-screen"));
 
+if (pendingInviteCode && $("room-code")) {
+  $("room-code").value = pendingInviteCode;
+}
+
 setAuthMode("login");
 initUserSystem(db, renderAuthUI);
 restoreSession();
@@ -596,8 +929,26 @@ restoreSession();
 function subscribeToRoom(code) {
   if (unsubscribeRoom) unsubscribeRoom();
   unsubscribeRoom = onValue(ref(db, `rooms/${code}`), (snap) => {
-    if (!snap.exists()) return;
-    roomState = normalizeRoomState(snap.val());
+    if (isLeavingRoom || localMode || currentRoomCode !== code) return;
+
+    if (!snap.exists()) {
+      resetLocalRoomSession("A sala foi encerrada.");
+      return;
+    }
+
+    const raw = snap.val();
+    roomPresence = raw.presence || {};
+    roomState = normalizeRoomState(raw);
+    updateOfflineTrackers();
+
+    const stillInRoom = roomState.players.some(p => p.id === myId);
+    if (stillInRoom) {
+      wasSeatedInRoom = true;
+    } else if (wasSeatedInRoom) {
+      resetLocalRoomSession("Foste removido da sala por inatividade.");
+      return;
+    }
+
     if (roomState.hostId === myId && roomState.phase === "WAITING" && roomState.players.length >= 2 && !roomState.nextHandDeadline) {
       update(ref(db, `rooms/${code}`), {
         nextHandDeadline: Date.now() + AUTO_START_DELAY_MS,
@@ -606,6 +957,121 @@ function subscribeToRoom(code) {
     }
     renderGame();
   });
+}
+
+async function attemptReconnectToRoom(code) {
+  if (!isFirebaseConfigured || !db || !code) return false;
+  try {
+    const snap = await withTimeout(get(ref(db, `rooms/${code}`)));
+    if (!snap.exists()) {
+      clearActiveRoomSession();
+      return false;
+    }
+    const raw = snap.val();
+    const state = normalizeRoomState(raw);
+    if (!state.players.some(p => p.id === myId)) {
+      clearActiveRoomSession();
+      showError("A sessão na sala anterior expirou.");
+      return false;
+    }
+
+    localMode = false;
+    currentRoomCode = code;
+    roomState = state;
+    roomPresence = raw.presence || {};
+    wasSeatedInRoom = true;
+    updateOfflineTrackers();
+    saveActiveRoomSession(code);
+    attachPresence(code);
+    openGameScreen();
+    renderGame();
+    subscribeToRoom(code);
+    return true;
+  } catch (err) {
+    console.error("Erro ao reconectar:", err);
+    return false;
+  }
+}
+
+async function joinOnlineRoom(rawCode, fromInvite = false) {
+  showError("");
+  if (!isFirebaseConfigured || !db) return showError("Firebase não configurado.");
+  const entry = getLoggedBuyInOrError(); if (!entry) return false;
+  const code = extractRoomCode(rawCode);
+  if (!code) return showError("Introduz o código da sala.");
+
+  const btn = $("btn-join-room"), prev = btn?.textContent || "Entrar";
+  if (btn && !fromInvite) { btn.disabled = true; btn.textContent = "A entrar..."; }
+
+  try {
+    const roomRef = ref(db, `rooms/${code}`);
+    const existsSnap = await withTimeout(get(roomRef));
+    if (!existsSnap.exists()) {
+      showError(`Sala "${code}" não encontrada.`);
+      return false;
+    }
+
+    let abortReason = "";
+    const txResult = await withTimeout(runTransaction(roomRef, (raw) => {
+      if (!raw) return raw;
+      const prevPresence = raw.presence || null;
+      const data = normalizeRoomState(raw);
+      const existingIdx = data.players.findIndex(p => p.id === myId);
+
+      if (existingIdx >= 0) {
+        data.players[existingIdx].name = entry.name;
+        if (prevPresence) data.presence = prevPresence;
+        return data;
+      }
+
+      if (data.players.length >= MAX_PLAYERS) {
+        abortReason = "A mesa já está cheia (6/6).";
+        return undefined;
+      }
+
+      data.players.push({
+        id: myId, name: entry.name, chips: entry.buyIn, handStartChips: entry.buyIn,
+        bet: 0, totalBet: 0, hand: [], folded: data.phase !== "WAITING",
+        allIn: false, acted: false, participated: false, isBot: false,
+        status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
+      });
+
+      if (data.phase === "WAITING" && data.players.length >= 2 && !data.nextHandDeadline) {
+        data.nextHandDeadline = Date.now() + AUTO_START_DELAY_MS;
+        data.message = `Jogadores na mesa (${data.players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`;
+      }
+
+      if (prevPresence) data.presence = prevPresence;
+      return data;
+    }));
+
+    if (abortReason) { showError(abortReason); return false; }
+    if (!txResult.committed || !txResult.snapshot.exists()) {
+      showError(`Sala "${code}" não encontrada.`);
+      return false;
+    }
+
+    const finalRaw = txResult.snapshot.val();
+    myName = entry.name;
+    localMode = false;
+    currentRoomCode = code;
+    roomState = normalizeRoomState(finalRaw);
+    roomPresence = finalRaw.presence || {};
+    wasSeatedInRoom = true;
+    updateOfflineTrackers();
+    saveActiveRoomSession(code);
+    clearInviteFromURL();
+    attachPresence(code);
+    openGameScreen();
+    renderGame();
+    subscribeToRoom(code);
+    return true;
+  } catch (err) {
+    showError(String(err?.message || err));
+    return false;
+  } finally {
+    if (btn && !fromInvite) { btn.disabled = false; btn.textContent = prev; }
+  }
 }
 
 on("btn-create-room", "click", async () => {
@@ -618,35 +1084,23 @@ on("btn-create-room", "click", async () => {
     myName = entry.name; localMode = false; currentRoomCode = generateRoomCode();
     const initial = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
     await withTimeout(set(ref(db, `rooms/${currentRoomCode}`), initial));
-    roomState = initial; openGameScreen(); renderGame(); subscribeToRoom(currentRoomCode);
+    roomState = initial;
+    roomPresence = {};
+    wasSeatedInRoom = true;
+    offlineSinceMap.clear();
+    saveActiveRoomSession(currentRoomCode);
+    clearInviteFromURL();
+    attachPresence(currentRoomCode);
+    openGameScreen();
+    renderGame();
+    subscribeToRoom(currentRoomCode);
   } catch (err) { showError(String(err?.message || err)); }
   finally { btn.disabled = false; btn.textContent = prev; }
 });
 
-on("btn-join-room", "click", async () => {
-  SoundEngine.init(); showError("");
-  if (!isFirebaseConfigured || !db) return showError("Firebase não configurado.");
-  const entry = getLoggedBuyInOrError(); if (!entry) return;
-  const code = ($("room-code")?.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (!code) return showError("Introduz o código da sala.");
-  const btn = $("btn-join-room"), prev = btn.textContent;
-  btn.disabled = true; btn.textContent = "A entrar...";
-  try {
-    const snap = await withTimeout(get(ref(db, `rooms/${code}`)));
-    if (!snap.exists()) return showError(`Sala "${code}" não encontrada.`);
-    const data = normalizeRoomState(snap.val());
-    if (data.players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
-    myName = entry.name; localMode = false; currentRoomCode = code;
-    data.players.push({
-      id: myId, name: myName, chips: entry.buyIn, handStartChips: entry.buyIn,
-      bet: 0, totalBet: 0, hand: [], folded: data.phase !== "WAITING",
-      allIn: false, acted: false, participated: false, isBot: false,
-      status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
-    });
-    await withTimeout(update(ref(db, `rooms/${code}`), { players: data.players }));
-    roomState = data; subscribeToRoom(code); openGameScreen(); renderGame();
-  } catch (err) { showError(String(err?.message || err)); }
-  finally { btn.disabled = false; btn.textContent = prev; }
+on("btn-join-room", "click", () => {
+  SoundEngine.init();
+  joinOnlineRoom($("room-code")?.value || "", false);
 });
 
 on("room-code", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-join-room")?.click(); } });
@@ -654,6 +1108,8 @@ on("room-code", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault();
 function startBotsGame() {
   SoundEngine.init(); showError("");
   const entry = getLoggedBuyInOrError(); if (!entry) return;
+  clearActiveRoomSession();
+  detachPresence(false);
   myName = entry.name; localMode = true; currentRoomCode = "OFFLINE";
   const demo = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
   ["Tiago", "Marta", "Rui", "Inês"].forEach((name, i) => demo.players.push({
@@ -661,7 +1117,8 @@ function startBotsGame() {
     bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
     participated: false, isBot: true, status: ""
   }));
-  roomState = demo; openGameScreen(); startNewHand();
+  roomState = demo; roomPresence = {}; wasSeatedInRoom = true;
+  openGameScreen(); startNewHand();
 }
 
 on("card-play-bots", "click", startBotsGame);
@@ -681,11 +1138,42 @@ function setQuickRaise(mode) {
 
 const copyCode = (e) => {
   if (!currentRoomCode) return;
-  navigator.clipboard?.writeText(currentRoomCode).catch(() => {});
+  const payload = localMode ? currentRoomCode : buildInviteLink(currentRoomCode);
+  navigator.clipboard?.writeText(payload).catch(() => {});
   const btn = e.currentTarget, prev = btn.textContent;
-  btn.textContent = "Copiado ✓";
-  setTimeout(() => { btn.textContent = prev; }, 1400);
+  btn.textContent = localMode ? "Copiado ✓" : "Link copiado ✓";
+  setTimeout(() => { btn.textContent = prev; }, 1500);
 };
+
+async function leaveCurrentRoom() {
+  if (isLeavingRoom) return;
+  isLeavingRoom = true;
+  const wasOnline = !localMode;
+  const codeToLeave = currentRoomCode;
+
+  settleHandBalanceIfNeeded(true);
+  stopTimerLoop();
+  if (unsubscribeRoom) { unsubscribeRoom(); unsubscribeRoom = null; }
+  detachPresence(true);
+  clearActiveRoomSession();
+
+  try {
+    if (wasOnline && db && codeToLeave) {
+      await removePlayerFromRoomTx(codeToLeave, myId, "saiu da mesa", false);
+    }
+  } finally {
+    roomState = null;
+    roomPresence = {};
+    currentRoomCode = null;
+    offlineSinceMap.clear();
+    wasMyTurn = false;
+    wasSeatedInRoom = false;
+    trackedHandId = 0;
+    handSettled = false;
+    isLeavingRoom = false;
+    showScreen(getCurrentUser() ? "hub-screen" : "auth-screen");
+  }
+}
 
 on("btn-start-game", "click", startNewHand);
 on("btn-new-match", "click", startNewMatchReset);
@@ -700,17 +1188,7 @@ on("btn-bet-half", "click", () => setQuickRaise("half"));
 on("btn-bet-pot", "click", () => setQuickRaise("pot"));
 on("btn-copy-code", "click", copyCode);
 on("btn-waiting-copy", "click", copyCode);
-
-on("btn-leave", "click", () => {
-  if (!localMode && roomState && roomState.turnIndex >= 0 && roomState.players[roomState.turnIndex]?.id === myId) {
-    handleAction(myId, "fold");
-  }
-  settleHandBalanceIfNeeded(true);
-  trackedHandId = 0; handSettled = false; stopTimerLoop();
-  if (unsubscribeRoom) unsubscribeRoom();
-  roomState = null; wasMyTurn = false;
-  showScreen(getCurrentUser() ? "hub-screen" : "auth-screen");
-});
+on("btn-leave", "click", leaveCurrentRoom);
 
 /* ============================================================================
    5. PWA E FULLSCREEN HORIZONTAL
