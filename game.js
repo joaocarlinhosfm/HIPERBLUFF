@@ -13,7 +13,8 @@ import {
   buildNewHandState, advancePhaseOnState, applyActionToState, removePlayerFromState
 } from "./poker.js";
 import {
-  INITIAL_BALANCE, initUserSystem, restoreSession, registerUser, loginUser,
+  INITIAL_BALANCE, AVATAR_CATALOG, getAvatarMarkup, updateUserAvatar,
+  initUserSystem, restoreSession, registerUser, loginUser,
   logoutUser, getCurrentUser, applyBalanceDelta, recordActionStats, formatEuro
 } from "./user.js";
 
@@ -429,7 +430,6 @@ function checkOnlineStability() {
   const players = roomState.players || [];
   if (!players.some(p => p.id === myId)) return;
 
-  // 1. Migração automática de hostId se o anfitrião sair ou cair
   if (roomState.hostId !== myId) {
     const hostSeated = players.some(p => p.id === roomState.hostId);
     const hostOfflineSince = offlineSinceMap.get(roomState.hostId);
@@ -444,7 +444,6 @@ function checkOnlineStability() {
     return;
   }
 
-  // 2. Limpeza de jogadores desligados pelo anfitrião após período de tolerância
   if (isCleaningDisconnected) return;
   const expiredPlayer = players.find(p => {
     if (p.id === myId || p.isBot) return false;
@@ -805,13 +804,19 @@ function renderGame() {
     const inHand = !p.folded && p.hand?.length === 2;
     const showCards = isMe || (roomState.isRunout && !p.folded) || (isShowdown && !p.folded && hasCardHighlights);
     const statusLabel = isPlayerOffline(p.id) ? "OFFLINE..." : p.status;
+    const hasCustomAvatar = Boolean(p.avatar && p.avatar !== "initial");
+    const avatarBg = hasCustomAvatar ? `<div class="seat-avatar-bg">${getAvatarMarkup(p.avatar, p.name)}</div>` : "";
 
     el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${inHand ? "has-cards" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
     const betPill = p.bet > 0 ? `<div class="bet-pill"><span class="mini-chip"></span>${p.bet.toLocaleString("pt-PT")} €</div>` : "";
     const ringInner = `
       ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
       ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
-      <div class="seat-circle"><div class="seat-name" title="${p.name}">${p.name}</div>${isMe ? `<div class="seat-you-tag">TU</div>` : ""}</div>
+      <div class="seat-circle ${hasCustomAvatar ? "has-avatar" : ""}">
+        ${avatarBg}
+        <div class="seat-name" title="${p.name}">${p.name}</div>
+        ${isMe ? `<div class="seat-you-tag">TU</div>` : ""}
+      </div>
       ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}`;
 
     if (isMe) {
@@ -878,8 +883,62 @@ function renderGame() {
 }
 
 /* ============================================================================
-   4. AUTENTICAÇÃO, HUB DE CARDS, PERFIL E MESAS PERMANENTES
+   4. AUTENTICAÇÃO, HUB, PERFIL, AVATARES E MESAS PERMANENTES
    ============================================================================ */
+let avatarFeedbackTimer = null;
+
+function renderAvatarGrid() {
+  const grid = $("avatar-grid");
+  const user = getCurrentUser();
+  if (!grid || !user) return;
+
+  const selectedId = user.avatar || "initial";
+  grid.innerHTML = AVATAR_CATALOG.map(av => {
+    const isSelected = av.id === selectedId;
+    return `
+      <button type="button" class="avatar-option ${isSelected ? "selected" : ""}" data-avatar-id="${av.id}">
+        <span class="avatar-check-dot" aria-hidden="true">✓</span>
+        <div class="avatar-option-preview">${getAvatarMarkup(av.id, user.username)}</div>
+        <span class="avatar-option-name">${av.name}</span>
+      </button>`;
+  }).join("");
+
+  grid.querySelectorAll(".avatar-option").forEach(btn => {
+    btn.addEventListener("click", () => handleSelectAvatar(btn.dataset.avatarId));
+  });
+}
+
+async function handleSelectAvatar(avatarId) {
+  SoundEngine.init();
+  const feedbackEl = $("avatar-feedback");
+  if (feedbackEl) feedbackEl.textContent = "A guardar avatar...";
+  try {
+    await updateUserAvatar(avatarId);
+    SoundEngine.chip();
+    renderAvatarGrid();
+    if (feedbackEl) {
+      feedbackEl.textContent = "Avatar atualizado ✓";
+      clearTimeout(avatarFeedbackTimer);
+      avatarFeedbackTimer = setTimeout(() => {
+        if ($("avatar-feedback")) $("avatar-feedback").textContent = "";
+      }, 1800);
+    }
+  } catch (err) {
+    if (feedbackEl) feedbackEl.textContent = err?.message || "Erro ao guardar avatar.";
+  }
+}
+
+function openAvatarModal() {
+  SoundEngine.init();
+  if ($("avatar-feedback")) $("avatar-feedback").textContent = "";
+  renderAvatarGrid();
+  $("avatar-modal")?.classList.remove("hidden");
+}
+
+function closeAvatarModal() {
+  $("avatar-modal")?.classList.add("hidden");
+}
+
 function closeOnlineModal() {
   $("online-modal")?.classList.add("hidden");
   unsubscribePermanentRoomsLobby();
@@ -888,6 +947,7 @@ function closeOnlineModal() {
 function openGameScreen() {
   trackedHandId = 0; handSettled = false;
   closeOnlineModal();
+  closeAvatarModal();
   if (roomState) applyGameBackground(roomState);
   showScreen("game-screen");
   startTimerLoop();
@@ -905,7 +965,7 @@ function getLoggedBuyInOrError(buyInCap = STARTING_CHIPS, minRequired = BIG_BLIN
     showError(`Saldo insuficiente. Precisas de pelo menos ${formatEuro(minRequired)}.`);
     return null;
   }
-  return { name: user.username, buyIn: Math.min(buyInCap, user.balance) };
+  return { name: user.username, avatar: user.avatar || "initial", buyIn: Math.min(buyInCap, user.balance) };
 }
 
 function resetLocalRoomSession(notice = "") {
@@ -949,12 +1009,13 @@ function renderAuthUI(user) {
   if (!user) {
     hasHandledInitialAutoEntry = false;
     closeOnlineModal();
+    closeAvatarModal();
     showScreen("auth-screen");
     return;
   }
 
   myName = user.username;
-  const initial = (user.username.trim()[0] || "J").toUpperCase();
+  const avatarHTML = getAvatarMarkup(user.avatar, user.username);
   const level = Math.floor(user.handsPlayed / 10) + 1;
   const xpPct = Math.max(8, ((user.handsPlayed % 10) / 10) * 100);
   const winRate = user.handsPlayed > 0 ? Math.round((user.handsWon / user.handsPlayed) * 100) : 0;
@@ -962,7 +1023,7 @@ function renderAuthUI(user) {
   const balFormatted = formatEuro(user.balance);
 
   // Atualizar Hub
-  if ($("hub-avatar-letter")) $("hub-avatar-letter").textContent = initial;
+  if ($("hub-avatar-letter")) $("hub-avatar-letter").innerHTML = avatarHTML;
   if ($("hub-username")) $("hub-username").textContent = user.username;
   if ($("hub-level")) $("hub-level").textContent = `LVL ${level}`;
   if ($("hub-xp-fill")) $("hub-xp-fill").style.width = `${xpPct}%`;
@@ -971,7 +1032,7 @@ function renderAuthUI(user) {
 
   // Atualizar Perfil Completo
   if ($("prof-top-balance")) $("prof-top-balance").textContent = balFormatted;
-  if ($("prof-avatar-letter")) $("prof-avatar-letter").textContent = initial;
+  if ($("prof-avatar-letter")) $("prof-avatar-letter").innerHTML = avatarHTML;
   if ($("prof-username")) $("prof-username").textContent = user.username;
   if ($("prof-level")) $("prof-level").textContent = `LVL ${level}`;
   if ($("prof-xp-fill")) $("prof-xp-fill").style.width = `${xpPct}%`;
@@ -997,6 +1058,9 @@ function renderAuthUI(user) {
 
   if (!$("online-modal")?.classList.contains("hidden")) {
     renderPermanentRoomCards();
+  }
+  if (!$("avatar-modal")?.classList.contains("hidden")) {
+    renderAvatarGrid();
   }
 
   if (getActiveScreenId() === "auth-screen") showScreen("hub-screen");
@@ -1035,11 +1099,12 @@ on("btn-logout", "click", () => {
   try { sessionStorage.removeItem(SETTLED_HAND_KEY); } catch (_) {}
   hasHandledInitialAutoEntry = false;
   closeOnlineModal();
+  closeAvatarModal();
   logoutUser();
   setAuthMode("login");
 });
 
-// Navegação dos Cards do Hub
+// Navegação dos Cards do Hub e Modais
 const openOnlineModal = async () => {
   SoundEngine.init();
   showError("");
@@ -1055,7 +1120,12 @@ $("online-modal")?.addEventListener("click", (e) => { if (e.target === $("online
 
 on("card-open-profile", "click", openProfile);
 on("hub-profile-trigger", "click", openProfile);
-on("btn-profile-back", "click", () => showScreen("hub-screen"));
+on("btn-profile-back", "click", () => { closeAvatarModal(); showScreen("hub-screen"); });
+
+on("btn-open-avatar-modal", "click", openAvatarModal);
+on("btn-change-avatar", "click", openAvatarModal);
+on("btn-close-avatar-modal", "click", closeAvatarModal);
+$("avatar-modal")?.addEventListener("click", (e) => { if (e.target === $("avatar-modal")) closeAvatarModal(); });
 
 setAuthMode("login");
 initUserSystem(db, renderAuthUI);
@@ -1150,7 +1220,6 @@ async function joinPermanentRoom(roomId) {
       let prevPresence = raw?.presence ? { ...raw.presence } : {};
       let data = raw ? normalizeRoomState(raw) : createPermanentRoomState(cfg);
 
-      // Garantir sempre metadados da mesa vitalícia
       data.roomId = cfg.id;
       data.roomName = cfg.name;
       data.permanent = true;
@@ -1159,7 +1228,6 @@ async function joinPermanentRoom(roomId) {
       data.bigBlind = cfg.bigBlind;
       data.tableLedIndex = cfg.ledIndex;
 
-      // Se a mesa só tiver fantasmas desligados há mais de 15s, limpa-a antes de entrar
       if (data.players.length > 0 && isRoomAbandoned(data, prevPresence)) {
         data = createPermanentRoomState(cfg);
         prevPresence = {};
@@ -1168,6 +1236,7 @@ async function joinPermanentRoom(roomId) {
       const existingIdx = data.players.findIndex(p => p.id === myId);
       if (existingIdx >= 0) {
         data.players[existingIdx].name = entry.name;
+        data.players[existingIdx].avatar = entry.avatar;
         if (!data.hostId || !data.players.some(p => p.id === data.hostId)) {
           data.hostId = myId;
         }
@@ -1181,7 +1250,8 @@ async function joinPermanentRoom(roomId) {
       }
 
       data.players.push({
-        id: myId, name: entry.name, chips: entry.buyIn, handStartChips: entry.buyIn,
+        id: myId, name: entry.name, avatar: entry.avatar,
+        chips: entry.buyIn, handStartChips: entry.buyIn,
         bet: 0, totalBet: 0, hand: [], folded: data.phase !== "WAITING",
         allIn: false, acted: false, participated: false, isBot: false,
         status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
@@ -1248,10 +1318,18 @@ function startBotsGame() {
     permanent: false,
     buyIn: STARTING_CHIPS,
     smallBlind: SMALL_BLIND,
-    bigBlind: BIG_BLIND
+    bigBlind: BIG_BLIND,
+    hostAvatar: entry.avatar
   });
-  ["Tiago", "Marta", "Rui", "Inês"].forEach((name, i) => demo.players.push({
-    id: `bot_${i}`, name, chips: STARTING_CHIPS, handStartChips: STARTING_CHIPS,
+  const botRoster = [
+    { name: "Tiago", avatar: "shark" },
+    { name: "Marta", avatar: "queen" },
+    { name: "Rui", avatar: "cowboy" },
+    { name: "Inês", avatar: "fox" }
+  ];
+  botRoster.forEach((b, i) => demo.players.push({
+    id: `bot_${i}`, name: b.name, avatar: b.avatar,
+    chips: STARTING_CHIPS, handStartChips: STARTING_CHIPS,
     bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
     participated: false, isBot: true, status: ""
   }));
