@@ -42,6 +42,9 @@ const SETTLED_HAND_KEY = "hiperbluff_settled_hand";
 const HOST_MIGRATE_GRACE_MS = 6000;
 const DISCONNECT_REMOVE_GRACE_MS = 15000;
 
+const BG_THEME_CLASSES = ["bg-theme-ice", "bg-theme-gold", "bg-theme-vip"];
+let activeBgTheme = "";
+
 function getOrCreatePlayerId() {
   try {
     let saved = sessionStorage.getItem(PLAYER_ID_KEY);
@@ -109,6 +112,25 @@ function applyTableLedTheme(index) {
   root.style.setProperty("--led-glow-soft", t.soft);
   lastLedIndex = safeIdx;
   try { sessionStorage.setItem("hiperbluff_led", String(safeIdx)); } catch (_) {}
+}
+
+function applyGameBackground(state) {
+  const gameScreen = $("game-screen");
+  if (!gameScreen || !state) return;
+
+  let theme = "bg-theme-ice";
+  if (state.roomId === "MESA_1") theme = "bg-theme-ice";
+  else if (state.roomId === "MESA_2") theme = "bg-theme-gold";
+  else if (state.roomId === "MESA_3") theme = "bg-theme-vip";
+  else {
+    const idx = ((Number(state.tableLedIndex) || 0) % BG_THEME_CLASSES.length + BG_THEME_CLASSES.length) % BG_THEME_CLASSES.length;
+    theme = BG_THEME_CLASSES[idx];
+  }
+
+  if (activeBgTheme === theme && gameScreen.classList.contains(theme)) return;
+  gameScreen.classList.remove(...BG_THEME_CLASSES);
+  gameScreen.classList.add(theme);
+  activeBgTheme = theme;
 }
 
 /* ============================================================================
@@ -705,6 +727,7 @@ function renderCardHTML(card, hidden = false, small = false, hl = "") {
 function renderGame() {
   if (!roomState) return;
   applyTableLedTheme(roomState.tableLedIndex);
+  applyGameBackground(roomState);
 
   if (roomState.lastEvent && roomState.lastEvent.ts !== lastPlayedEventTs) {
     lastPlayedEventTs = roomState.lastEvent.ts;
@@ -865,6 +888,7 @@ function closeOnlineModal() {
 function openGameScreen() {
   trackedHandId = 0; handSettled = false;
   closeOnlineModal();
+  if (roomState) applyGameBackground(roomState);
   showScreen("game-screen");
   startTimerLoop();
 }
