@@ -1,3 +1,14 @@
+import {
+  initUserSystem,
+  restoreSession,
+  registerUser,
+  loginUser,
+  logoutUser,
+  getCurrentUser,
+  applyBalanceDelta,
+  formatEuro
+} from "./user.js";
+
 /* ============================================================================
    1. CONFIGURAÇÃO FIREBASE (CARREGADO DINAMICAMENTE — O JOGO ARRANCA MESMO OFFLINE)
    ============================================================================ */
@@ -451,6 +462,7 @@ function normalizeRoomState(raw) {
   return {
     hostId: raw.hostId || "",
     tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
+    handId: Number(raw.handId) || 0,
     phase: raw.phase || "WAITING",
     pot: Number(raw.pot) || 0,
     currentBet: Number(raw.currentBet) || 0,
@@ -472,6 +484,8 @@ function normalizeRoomState(raw) {
       id: p.id,
       name: cleanText(p.name, MAX_NAME_LEN) || "Jogador",
       chips: Number(p.chips) || 0,
+      handStartChips: Number(p.handStartChips) || 0,
+      participated: Boolean(p.participated),
       bet: Number(p.bet) || 0,
       totalBet: Number(p.totalBet) || 0,
       hand: Array.isArray(p.hand) ? p.hand : Object.values(p.hand || {}),
@@ -546,10 +560,11 @@ function generateRoomCode() {
   return code;
 }
 
-function createInitialRoom(hostId, hostName) {
+function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIPS) {
   return {
     hostId,
     tableLedIndex: pickNextLedIndex(),
+    handId: 0,
     phase: "WAITING",
     pot: 0,
     currentBet: 0,
@@ -568,7 +583,11 @@ function createInitialRoom(hostId, hostName) {
     community: [],
     message: "A aguardar jogadores... Partilha o código da sala!",
     players: [
-      { id: hostId, name: hostName, chips: STARTING_CHIPS, bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false, isBot: false, status: "PRONTO" }
+      {
+        id: hostId, name: hostName, chips: initialChips, handStartChips: initialChips,
+        bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
+        participated: false, isBot: false, status: "PRONTO"
+      }
     ]
   };
 }
@@ -718,6 +737,7 @@ function startNewHand() {
   s.community = [];
   s.pot = 0;
   s.phase = "PREFLOP";
+  s.handId = (Number(s.handId) || 0) + 1;
   s.nextHandDeadline = 0;
   s.isRunout = false;
   s.runoutDeadline = 0;
@@ -736,6 +756,8 @@ function startNewHand() {
   s.dealerIndex = nextDealer;
 
   s.players.forEach(p => {
+    p.handStartChips = p.chips;
+    p.participated = p.chips > 0;
     p.bet = 0;
     p.totalBet = 0;
     p.folded = p.chips <= 0;
@@ -805,33 +827,37 @@ async function performRebuy() {
   const me = roomState.players[myIdx];
   if (me.chips > 0) return;
 
+  const user = getCurrentUser();
+  const rebuyAmount = user ? Math.min(STARTING_CHIPS, user.balance) : STARTING_CHIPS;
+  if (rebuyAmount < BIG_BLIND) return;
+
   const inActiveHand = roomState.phase !== "WAITING" && roomState.phase !== "SHOWDOWN";
   const newStatus = inActiveHand ? "REBUY (PRÓX. MÃO)" : "REBUY";
 
   if (localMode) {
     const s = normalizeRoomState(structuredClone(roomState));
-    s.players[myIdx].chips = STARTING_CHIPS;
+    s.players[myIdx].chips = rebuyAmount;
     s.players[myIdx].status = newStatus;
     if (!inActiveHand) {
       s.players[myIdx].folded = false;
       const alive = s.players.filter(pl => pl.chips > 0).length;
       if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
         s.nextHandDeadline = nowMs() + 3000;
-        s.message = `${me.name} fez Rebuy (+${STARTING_CHIPS}€)! Nova mão a começar...`;
+        s.message = `${me.name} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
       }
     }
     setSoundEvent(s, "chip");
     syncState(s);
   } else if (db && currentRoomCode) {
     const updates = {};
-    updates[`players/${myIdx}/chips`] = STARTING_CHIPS;
+    updates[`players/${myIdx}/chips`] = rebuyAmount;
     updates[`players/${myIdx}/status`] = newStatus;
     if (!inActiveHand) {
       updates[`players/${myIdx}/folded`] = false;
       const aliveAfter = roomState.players.filter((pl, idx) => (idx === myIdx ? true : pl.chips > 0)).length;
       if (roomState.phase === "SHOWDOWN" && aliveAfter >= 2 && roomState.nextHandDeadline === 0) {
         updates["nextHandDeadline"] = nowMs() + 3000;
-        updates["message"] = `${me.name} fez Rebuy (+${STARTING_CHIPS}€)! Nova mão a começar...`;
+        updates["message"] = `${me.name} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
       }
     }
     SoundEngine.chip();
@@ -1232,6 +1258,40 @@ function renderCardHTML(card, hidden = false, small = false, highlightClass = ""
   `;
 }
 
+let trackedHandId = 0;
+let handSettled = false;
+
+function settleHandBalanceIfNeeded(forceLeave = false) {
+  if (!roomState) return;
+  const user = getCurrentUser();
+  if (!user) return;
+
+  const handId = Number(roomState.handId) || 0;
+  if (handId <= 0) return;
+
+  if (handId !== trackedHandId) {
+    trackedHandId = handId;
+    handSettled = false;
+  }
+  if (handSettled) return;
+
+  const me = (roomState.players || []).find(p => p.id === myId);
+  if (!me || !me.participated) {
+    if (me && !me.participated) handSettled = true;
+    return;
+  }
+
+  const isShowdown = roomState.phase === "SHOWDOWN";
+  if (!isShowdown && !me.folded && !forceLeave) return;
+
+  handSettled = true;
+  const delta = me.chips - (Number(me.handStartChips) || 0);
+  const won = isShowdown && (roomState.winnerIds || []).includes(myId);
+
+  if (forceLeave && delta === 0) return;
+  applyBalanceDelta(delta, { won, countHand: true });
+}
+
 function renderGame() {
   if (!roomState) return;
 
@@ -1490,6 +1550,7 @@ function renderGame() {
     }
   }
 
+  settleHandBalanceIfNeeded(false);
   tickTimers();
 }
 
@@ -1497,6 +1558,8 @@ function renderGame() {
    10. EVENTOS DE LOBBY, APOSTAS RÁPIDAS E CONTROLOS
    ============================================================================ */
 function openGameScreen() {
+  trackedHandId = 0;
+  handSettled = false;
   if ($("lobby-screen")) $("lobby-screen").classList.remove("active");
   if ($("game-screen")) $("game-screen").classList.add("active");
   startTimerLoop();
@@ -1504,6 +1567,22 @@ function openGameScreen() {
 
 function showError(msg) {
   if ($("lobby-error")) $("lobby-error").textContent = msg;
+}
+
+function getLoggedBuyInOrError() {
+  const user = getCurrentUser();
+  if (!user) {
+    showError("Inicia sessão primeiro.");
+    return null;
+  }
+  if (user.balance < BIG_BLIND) {
+    showError(`Saldo insuficiente (${formatEuro(user.balance)}). Mínimo: ${BIG_BLIND} €.`);
+    return null;
+  }
+  return {
+    name: user.username,
+    buyIn: Math.min(STARTING_CHIPS, user.balance)
+  };
 }
 
 function copyRoomCodeWithFeedback(btn) {
@@ -1557,6 +1636,9 @@ on("btn-create-room", "click", async () => {
   SoundEngine.init();
   showError("");
 
+  const entry = getLoggedBuyInOrError();
+  if (!entry) return;
+
   const btn = $("btn-create-room");
   const originalText = btn.textContent;
   btn.disabled = true;
@@ -1569,10 +1651,10 @@ on("btn-create-room", "click", async () => {
       return;
     }
 
-    myName = cleanText($("player-name")?.value, MAX_NAME_LEN) || "Jogador";
+    myName = entry.name;
     localMode = false;
     currentRoomCode = generateRoomCode();
-    const initial = createInitialRoom(myId, myName);
+    const initial = createInitialRoom(myId, myName, entry.buyIn);
 
     await withTimeout(set(ref(db, `rooms/${currentRoomCode}`), initial));
     saveLastRoom(currentRoomCode);
@@ -1598,8 +1680,11 @@ on("btn-join-room", "click", async () => {
   SoundEngine.init();
   showError("");
 
+  const entry = getLoggedBuyInOrError();
+  if (!entry) return;
+
   const code = ($("room-code")?.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-  myName = cleanText($("player-name")?.value, MAX_NAME_LEN) || "Jogador";
+  myName = entry.name;
 
   const btn = $("btn-join-room");
   const originalText = btn.textContent;
@@ -1626,7 +1711,8 @@ on("btn-join-room", "click", async () => {
     const data = normalizeRoomState(snap.val());
     const isWaitingPhase = data.phase === "WAITING";
     const newPlayer = {
-      id: myId, name: myName, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
+      id: myId, name: myName, chips: entry.buyIn, handStartChips: entry.buyIn,
+      participated: false, bet: 0, totalBet: 0,
       hand: [], folded: !isWaitingPhase, allIn: false, acted: false, isBot: false,
       status: isWaitingPhase ? "PRONTO" : "A AGUARDAR MÃO"
     };
@@ -1713,14 +1799,17 @@ function subscribeToRoom(code) {
 on("btn-demo-mode", "click", () => {
   SoundEngine.init();
   showError("");
-  myName = cleanText($("player-name")?.value, MAX_NAME_LEN) || "Tu";
+  const entry = getLoggedBuyInOrError();
+  if (!entry) return;
+  myName = entry.name;
   localMode = true;
   currentRoomCode = "OFFLINE";
-  const demo = createInitialRoom(myId, myName);
+  const demo = createInitialRoom(myId, myName, entry.buyIn);
   const botNames = ["Tiago", "Marta", "Rui", "Inês"];
   botNames.forEach((name, i) => {
     demo.players.push({
-      id: `bot_${i}`, name, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
+      id: `bot_${i}`, name, chips: STARTING_CHIPS, handStartChips: STARTING_CHIPS,
+      participated: false, bet: 0, totalBet: 0,
       hand: [], folded: false, allIn: false, acted: false, isBot: true, status: ""
     });
   });
@@ -1749,6 +1838,9 @@ on("btn-copy-code", "click", (e) => copyRoomCodeWithFeedback(e.currentTarget));
 on("btn-waiting-copy", "click", (e) => copyRoomCodeWithFeedback(e.currentTarget));
 
 on("btn-leave", "click", async () => {
+  settleHandBalanceIfNeeded(true);
+  trackedHandId = 0;
+  handSettled = false;
   if (!localMode && roomState && roomState.turnIndex >= 0) {
     const active = roomState.players[roomState.turnIndex];
     if (active && active.id === myId) {
@@ -1767,6 +1859,92 @@ on("btn-leave", "click", async () => {
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     exitFullscreenMode();
   }
+});
+
+let authMode = "login";
+
+function setAuthMode(mode) {
+  authMode = mode;
+  if ($("tab-login")) $("tab-login").classList.toggle("active", mode === "login");
+  if ($("tab-register")) $("tab-register").classList.toggle("active", mode === "register");
+  if ($("btn-auth-submit")) {
+    $("btn-auth-submit").textContent = mode === "login" ? "Entrar" : "Criar Conta (+100 000 €)";
+  }
+  if ($("auth-hint")) $("auth-hint").classList.toggle("hidden", mode !== "register");
+  if ($("auth-error")) $("auth-error").textContent = "";
+}
+
+function renderAuthUI(user) {
+  const logged = Boolean(user);
+  if ($("auth-panel")) $("auth-panel").classList.toggle("hidden", logged);
+  if ($("play-panel")) $("play-panel").classList.toggle("hidden", !logged);
+
+  if (logged) {
+    myName = user.username;
+    if ($("profile-username")) $("profile-username").textContent = user.username;
+    if ($("profile-balance")) $("profile-balance").textContent = formatEuro(user.balance);
+    if ($("profile-stats")) {
+      $("profile-stats").textContent = `${user.handsPlayed} mãos • ${user.handsWon} vitórias`;
+    }
+  }
+}
+
+on("tab-login", "click", () => setAuthMode("login"));
+on("tab-register", "click", () => setAuthMode("register"));
+
+on("auth-pin", "input", (e) => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
+});
+
+async function handleAuthSubmit() {
+  SoundEngine.init();
+  const errEl = $("auth-error");
+  const btn = $("btn-auth-submit");
+  if (errEl) errEl.textContent = "";
+
+  const username = $("auth-username")?.value || "";
+  const pin = $("auth-pin")?.value || "";
+
+  const prevText = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = authMode === "login" ? "A entrar..." : "A criar conta...";
+  }
+
+  try {
+    if (authMode === "login") {
+      await loginUser(username, pin);
+    } else {
+      await registerUser(username, pin);
+    }
+    if ($("auth-pin")) $("auth-pin").value = "";
+  } catch (err) {
+    if (errEl) errEl.textContent = err?.message || "Erro na autenticação.";
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+  }
+}
+
+on("btn-auth-submit", "click", handleAuthSubmit);
+on("auth-pin", "keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    handleAuthSubmit();
+  }
+});
+
+on("btn-logout", "click", () => {
+  logoutUser();
+  setAuthMode("login");
+});
+
+// O Firebase carrega de forma assíncrona: só aqui é que `db` já tem valor.
+firebaseReady.then(() => {
+  initUserSystem(db, renderAuthUI);
+  restoreSession();
 });
 
 /* ============================================================================

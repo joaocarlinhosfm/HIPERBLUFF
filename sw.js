@@ -1,9 +1,10 @@
-const CACHE_NAME = "hiperbluff-v7.2";
+const CACHE_NAME = "hiperbluff-v7.4";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./game.js",
+  "./user.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
