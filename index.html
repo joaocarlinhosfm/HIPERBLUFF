@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>HIPERBLUFF — Poker Multiplayer</title>
-  <link rel="stylesheet" href="style.css?v=18" />
-  <link rel="stylesheet" href="menus.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=22" />
+  <link rel="stylesheet" href="menus.css?v=22" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#071321" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -144,7 +144,7 @@
           <div class="card-body">
             <div class="card-emblem" aria-hidden="true">🏆</div>
             <h2>O TEU PERFIL</h2>
-            <p>Vitórias, Folds, All-Ins, Raises, Calls, Checks e maior ganho.</p>
+            <p>Escolhe o teu avatar e acompanha vitórias, Folds, All-Ins e maior ganho.</p>
             <div id="card-profile-summary" class="card-mini-stat">0 vitórias • 0%</div>
           </div>
           <button id="btn-open-profile" class="card-cta" type="button">Ver Perfil</button>
@@ -166,7 +166,11 @@
 
     <main class="profile-main">
       <section class="profile-summary-card">
-        <div id="prof-avatar-letter" class="avatar-circle large">J</div>
+        <button id="btn-open-avatar-modal" class="profile-avatar-btn" type="button" title="Escolher Avatar">
+          <div id="prof-avatar-letter" class="avatar-circle large">J</div>
+          <span class="avatar-edit-badge" aria-hidden="true">✎</span>
+        </button>
+        <button id="btn-change-avatar" class="btn-avatar-picker" type="button">Mudar Avatar</button>
         <div id="prof-username" class="profile-big-name">Jogador</div>
         <div class="hub-level-row">
           <span id="prof-level" class="hub-level-tag">LVL 1</span>
@@ -410,6 +414,18 @@
       </div>
 
       <p id="lobby-error" class="error-msg"></p>
+    </div>
+  </div>
+
+  <!-- MODAL SELETOR DE AVATARES (PERFIL) -->
+  <div id="avatar-modal" class="modal-backdrop hidden">
+    <div class="modal-box avatar-modal-box">
+      <div class="modal-head">
+        <h3>🎭 Escolher Avatar</h3>
+        <button id="btn-close-avatar-modal" class="btn-tiny" type="button">✕ Fechar</button>
+      </div>
+      <div id="avatar-grid" class="avatar-grid"></div>
+      <p id="avatar-feedback" class="avatar-feedback"></p>
     </div>
   </div>
 
