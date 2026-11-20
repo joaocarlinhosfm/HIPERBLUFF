@@ -446,6 +446,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
 
 .poker-table {
   position: relative;
+  isolation: isolate;
   width: min(740px, 66vw);
   height: min(320px, 44dvh);
   display: flex;
@@ -459,6 +460,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   perspective: 660px;
   perspective-origin: 50% 34%;
   pointer-events: none;
+  isolation: isolate;
   z-index: 1;
 }
 
@@ -535,7 +537,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 6;
+  z-index: 8;
   pointer-events: none;
 }
 
@@ -593,7 +595,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   pointer-events: auto;
 }
 
-.table-center { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; z-index: 3; margin-top: 0.4rem; position: relative; }
+.table-center { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; z-index: 5; margin-top: 0.4rem; position: relative; }
 .pot-zone { display: flex; align-items: center; justify-content: center; gap: 0.65rem; min-height: 30px; }
 .pot-chips { display: flex; align-items: flex-end; gap: 5px; height: 28px; }
 .chip-stack { display: flex; flex-direction: column-reverse; align-items: center; }
@@ -648,20 +650,22 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
 
 @keyframes bannerPop { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
 
-/* ================= CARTAS HD ================= */
+/* ================= CARTAS HD (100% OPACAS) ================= */
 .card {
   width: 56px;
   height: 80px;
+  background-color: #ffffff;
   background: linear-gradient(155deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
-  border: 1px solid rgba(15, 23, 42, 0.16);
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   color: #0f172a;
+  opacity: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 3px 4px;
   font-weight: 900;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55), inset 0 1px 0 #ffffff;
   position: relative;
   transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease;
 }
@@ -673,7 +677,13 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
 .card-suit-mini { font-size: 0.7rem; }
 .card-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.65rem; line-height: 1; }
 
-.card.back { background: linear-gradient(145deg, #f8fafc, #cbd5e1); padding: 2.5px; border: 1px solid rgba(255, 255, 255, 0.85); }
+.card.back {
+  background-color: #ffffff;
+  background: linear-gradient(145deg, #ffffff, #cbd5e1);
+  padding: 2.5px;
+  border: 1px solid #ffffff;
+  opacity: 1;
+}
 .card-back-inner {
   width: 100%;
   height: 100%;
@@ -687,7 +697,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   align-items: center;
   justify-content: center;
 }
-.card-back-emblem { color: rgba(186, 230, 253, 0.85); font-size: 1rem; text-shadow: 0 0 8px rgba(56, 189, 248, 0.85); }
+.card-back-emblem { color: rgba(186, 230, 253, 0.92); font-size: 1rem; text-shadow: 0 0 8px rgba(56, 189, 248, 0.85); }
 
 .card.small { width: 28px; height: 40px; padding: 2px; border-radius: 5px; }
 .card.small .card-corner { width: 9px; }
@@ -698,11 +708,13 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
 
 .card.card-win { border: 2.5px solid #fde047; box-shadow: 0 0 18px 4px rgba(251, 191, 36, 0.9), 0 0 8px 1px rgba(255, 255, 255, 0.85); z-index: 8 !important; }
 .community-cards .card.card-win { transform: translateY(-6px) scale(1.06); }
-.card.card-dim { filter: brightness(0.45) saturate(0.55); opacity: 0.82; }
+.card.card-dim { filter: brightness(0.5) saturate(0.6); opacity: 1; }
 
 /* ================= LUGARES ZYNGA (5 LUGARES + 6 LUGARES) ================= */
-.seats-container { position: absolute; inset: 0; pointer-events: none; }
-.seat { position: absolute; width: 112px; transform: translate(-50%, -50%); pointer-events: auto; display: flex; flex-direction: column; align-items: center; transition: opacity 0.25s ease; }
+.seats-container { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+.seat { position: absolute; width: 112px; transform: translate(-50%, -50%); pointer-events: auto; display: flex; flex-direction: column; align-items: center; transition: opacity 0.25s ease; z-index: 1; }
+.seat.active-turn { z-index: 2; }
+.seat.is-me { z-index: 3; }
 
 .seat-0 { left: 50%; top: 96%; }
 .seat-1 { left: 2%;  top: 72%; }
