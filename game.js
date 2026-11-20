@@ -1,18 +1,19 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { SoundEngine } from "./audio.js";
 import {
-  initUserSystem,
-  restoreSession,
-  registerUser,
-  loginUser,
-  logoutUser,
-  getCurrentUser,
-  applyBalanceDelta,
-  formatEuro
+  MAX_PLAYERS, STARTING_CHIPS, BIG_BLIND, TURN_DURATION_MS, AUTO_START_DELAY_MS, LED_THEMES,
+  cardKey, secureRandomInt, generateRoomCode, evaluateBestHand, buildSidePots,
+  normalizeRoomState, createInitialRoom, setSoundEvent,
+  buildNewHandState, advancePhaseOnState, applyActionToState
+} from "./poker.js";
+import {
+  initUserSystem, restoreSession, registerUser, loginUser,
+  logoutUser, getCurrentUser, applyBalanceDelta, formatEuro
 } from "./user.js";
 
 /* ============================================================================
-   1. CONFIGURAÇÃO FIREBASE
+   1. CONFIGURAÇÃO FIREBASE E HELPERS
    ============================================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyADFQ4N7oNo2QDJXeos685Oi5O4tCyyVCk",
@@ -23,241 +24,28 @@ const firebaseConfig = {
 
 let db = null;
 const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.databaseURL);
-
 if (isFirebaseConfigured) {
   try {
-    const app = initializeApp(firebaseConfig);
-    db = getDatabase(app);
+    db = getDatabase(initializeApp(firebaseConfig));
   } catch (err) {
     console.error("Erro ao inicializar Firebase:", err);
   }
 }
 
-/* ============================================================================
-   2. MOTOR DE ÁUDIO SINTÉTICO (WEB AUDIO API — ZERO MP3 EXTERNOS)
-   ============================================================================ */
-const SoundEngine = {
-  ctx: null,
-  muted: false,
-
-  init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) this.ctx = new AudioCtx();
-    }
-    if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume().catch(() => {});
-    }
-  },
-
-  toggleMute() {
-    this.muted = !this.muted;
-    return this.muted;
-  },
-
-  playNoise(duration, filterType, freqStart, freqEnd, gainPeak, delay = 0) {
-    if (this.muted || !this.ctx) return;
-    const now = this.ctx.currentTime + delay;
-    const bufferSize = Math.floor(this.ctx.sampleRate * duration);
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-    const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = filterType;
-    filter.frequency.setValueAtTime(freqStart, now);
-    if (freqEnd !== freqStart) {
-      filter.frequency.exponentialRampToValueAtTime(Math.max(40, freqEnd), now + duration);
-    }
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(gainPeak, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    src.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.ctx.destination);
-    src.start(now);
-    src.stop(now + duration);
-  },
-
-  playTone(freqStart, freqEnd, duration, type, gainPeak, delay = 0) {
-    if (this.muted || !this.ctx) return;
-    const now = this.ctx.currentTime + delay;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = type;
-    osc.frequency.setValueAtTime(freqStart, now);
-    if (freqEnd !== freqStart) {
-      osc.frequency.exponentialRampToValueAtTime(Math.max(30, freqEnd), now + duration);
-    }
-
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(gainPeak, now + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start(now);
-    osc.stop(now + duration);
-  },
-
-  shuffle() {
-    this.init();
-    for (let i = 0; i < 7; i++) {
-      this.playNoise(0.045, "bandpass", 1800 + i * 120, 900, 0.14, i * 0.038);
-    }
-  },
-
-  card() {
-    this.init();
-    this.playNoise(0.055, "highpass", 1500, 700, 0.16, 0);
-    this.playTone(220, 90, 0.04, "sine", 0.08, 0);
-  },
-
-  chip(delay = 0) {
-    this.init();
-    this.playTone(2550, 2400, 0.055, "sine", 0.11, delay);
-    this.playTone(3900, 3600, 0.04, "triangle", 0.07, delay);
-    this.playTone(2800, 2600, 0.05, "sine", 0.08, delay + 0.045);
-  },
-
-  allIn() {
-    this.init();
-    for (let i = 0; i < 5; i++) {
-      this.chip(i * 0.065);
-    }
-  },
-
-  check() {
-    this.init();
-    this.playTone(170, 65, 0.06, "sine", 0.22, 0);
-    this.playTone(160, 60, 0.06, "sine", 0.18, 0.11);
-  },
-
-  fold() {
-    this.init();
-    this.playNoise(0.14, "lowpass", 950, 240, 0.15, 0);
-  },
-
-  tick(urgent = false) {
-    this.init();
-    this.playTone(urgent ? 1046 : 784, urgent ? 1046 : 784, 0.055, "sine", 0.09, 0);
-  },
-
-  myTurn() {
-    this.init();
-    this.playTone(587.33, 587.33, 0.09, "triangle", 0.08, 0);
-    this.playTone(880, 880, 0.14, "triangle", 0.09, 0.09);
-  },
-
-  win() {
-    this.init();
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((n, i) => {
-      this.playTone(n, n, 0.24, "triangle", 0.11, i * 0.09);
-    });
-  },
-
-  playEvent(type) {
-    if (type === "shuffle") this.shuffle();
-    else if (type === "card") this.card();
-    else if (type === "chip") this.chip();
-    else if (type === "allin") this.allIn();
-    else if (type === "check") this.check();
-    else if (type === "fold") this.fold();
-    else if (type === "win") this.win();
-  }
-};
-
-document.addEventListener("pointerdown", () => SoundEngine.init(), { once: true });
-
-/* ============================================================================
-   3. CONSTANTES, LED 3D, HELPERS SEGUROS E SHUFFLE CSPRNG + FISHER-YATES
-   ============================================================================ */
-const SUITS = ["♠", "♥", "♦", "♣"];
-const RANKS = [
-  { v: 2, l: "2" }, { v: 3, l: "3" }, { v: 4, l: "4" }, { v: 5, l: "5" },
-  { v: 6, l: "6" }, { v: 7, l: "7" }, { v: 8, l: "8" }, { v: 9, l: "9" },
-  { v: 10, l: "10" }, { v: 11, l: "J" }, { v: 12, l: "Q" }, { v: 13, l: "K" }, { v: 14, l: "A" }
-];
-const HAND_NAMES = [
-  "Carta Alta", "Um Par", "Dois Pares", "Trio", "Sequência",
-  "Flush", "Full House", "Poker", "Straight Flush", "Royal Flush"
-];
-
-const MAX_PLAYERS = 6;
-const STARTING_CHIPS = 1000;
-const SMALL_BLIND = 10;
-const BIG_BLIND = 20;
-
-const TURN_DURATION_MS = 20000;
-const NEXT_HAND_DELAY_MS = 6000;
-const AUTO_START_DELAY_MS = 10000;
-const RUNOUT_STEP_MS = 1300;
-
-const LED_THEMES = [
-  { name: "Gelo",       core: "#38bdf8", bright: "#bae6fd", soft: "rgba(56, 189, 248, 0.45)" },
-  { name: "Ouro Vegas", core: "#f59e0b", bright: "#fef08a", soft: "rgba(245, 158, 11, 0.46)" },
-  { name: "Roxo Neon",  core: "#a855f7", bright: "#e9d5ff", soft: "rgba(168, 85, 247, 0.48)" },
-  { name: "Rubi",       core: "#f43f5e", bright: "#fecdd3", soft: "rgba(244, 63, 94, 0.46)" },
-  { name: "Esmeralda",  core: "#10b981", bright: "#a7f3d0", soft: "rgba(16, 185, 129, 0.46)" },
-  { name: "Magenta",    core: "#ec4899", bright: "#fbcfe8", soft: "rgba(236, 72, 153, 0.46)" },
-  { name: "Âmbar",      core: "#f97316", bright: "#fed7aa", soft: "rgba(249, 115, 22, 0.46)" }
-];
-
-let lastLedIndex = Number(sessionStorage.getItem("hiperbluff_led") ?? -1);
-
 const $ = (id) => document.getElementById(id);
-const on = (id, event, handler) => {
-  const el = $(id);
-  if (el) el.addEventListener(event, handler);
-};
+const on = (id, event, handler) => { const el = $(id); if (el) el.addEventListener(event, handler); };
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Sem resposta do Firebase (timeout). Verifica a internet ou a Realtime Database.")), ms)
-    )
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Sem resposta do Firebase (timeout).")), ms))
   ]);
 }
 
-function cardKey(card) {
-  return card ? `${card.rank}_${card.suit}` : "";
-}
-
-function createDeck() {
-  const deck = [];
-  for (const s of SUITS) {
-    for (const r of RANKS) {
-      deck.push({ rank: r.v, label: r.l, suit: s });
-    }
-  }
-  return deck;
-}
-
-function secureRandomInt(max) {
-  const buf = new Uint32Array(1);
-  const limit = Math.floor(0x100000000 / max) * max;
-  let rand;
-  do {
-    window.crypto.getRandomValues(buf);
-    rand = buf[0];
-  } while (rand >= limit);
-  return rand % max;
-}
-
+let lastLedIndex = Number(sessionStorage.getItem("hiperbluff_led") ?? -1);
 function pickNextLedIndex() {
   let idx;
-  do {
-    idx = secureRandomInt(LED_THEMES.length);
-  } while (idx === lastLedIndex && LED_THEMES.length > 1);
+  do { idx = secureRandomInt(LED_THEMES.length); } while (idx === lastLedIndex && LED_THEMES.length > 1);
   lastLedIndex = idx;
   try { sessionStorage.setItem("hiperbluff_led", String(idx)); } catch (_) {}
   return idx;
@@ -265,194 +53,20 @@ function pickNextLedIndex() {
 
 function applyTableLedTheme(index) {
   const safeIdx = ((Number(index) || 0) % LED_THEMES.length + LED_THEMES.length) % LED_THEMES.length;
-  const theme = LED_THEMES[safeIdx];
+  const t = LED_THEMES[safeIdx];
   const root = document.documentElement;
-  root.style.setProperty("--led-core", theme.core);
-  root.style.setProperty("--led-bright", theme.bright);
-  root.style.setProperty("--led-glow-soft", theme.soft);
+  root.style.setProperty("--led-core", t.core);
+  root.style.setProperty("--led-bright", t.bright);
+  root.style.setProperty("--led-glow-soft", t.soft);
   lastLedIndex = safeIdx;
   try { sessionStorage.setItem("hiperbluff_led", String(safeIdx)); } catch (_) {}
 }
 
-function shuffleDeck(deck) {
-  const arr = [...deck];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = secureRandomInt(i + 1);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 /* ============================================================================
-   4. AVALIADOR OFICIAL DE MÃOS (5 DE 7 CARTAS + KICKERS) E SIDE POTS
-   ============================================================================ */
-function scoreFiveCards(cards) {
-  const values = cards.map(c => c.rank).sort((a, b) => b - a);
-  const isFlush = cards.every(c => c.suit === cards[0].suit);
-
-  const unique = [...new Set(values)];
-  let straightHigh = 0;
-  if (unique.length === 5) {
-    if (unique[0] - unique[4] === 4) {
-      straightHigh = unique[0];
-    } else if (unique[0] === 14 && unique[1] === 5 && unique[4] === 2) {
-      straightHigh = 5;
-    }
-  }
-
-  const counts = {};
-  for (const v of values) counts[v] = (counts[v] || 0) + 1;
-  const groups = Object.entries(counts)
-    .map(([v, c]) => ({ v: Number(v), c }))
-    .sort((a, b) => b.c - a.c || b.v - a.v);
-
-  let cat = 0;
-  let tiebreakers = values;
-
-  if (isFlush && straightHigh) {
-    cat = straightHigh === 14 ? 9 : 8;
-    tiebreakers = [straightHigh];
-  } else if (groups[0].c === 4) {
-    cat = 7;
-    tiebreakers = [groups[0].v, groups[1].v];
-  } else if (groups[0].c === 3 && groups[1].c === 2) {
-    cat = 6;
-    tiebreakers = [groups[0].v, groups[1].v];
-  } else if (isFlush) {
-    cat = 5;
-    tiebreakers = values;
-  } else if (straightHigh) {
-    cat = 4;
-    tiebreakers = [straightHigh];
-  } else if (groups[0].c === 3) {
-    cat = 3;
-    tiebreakers = [groups[0].v, groups[1].v, groups[2].v];
-  } else if (groups[0].c === 2 && groups[1].c === 2) {
-    cat = 2;
-    tiebreakers = [groups[0].v, groups[1].v, groups[2].v];
-  } else if (groups[0].c === 2) {
-    cat = 1;
-    tiebreakers = [groups[0].v, groups[1].v, groups[2].v, groups[3].v];
-  }
-
-  let score = cat * Math.pow(15, 5);
-  for (let i = 0; i < tiebreakers.length; i++) {
-    score += tiebreakers[i] * Math.pow(15, 4 - i);
-  }
-  return { score, name: HAND_NAMES[cat], cards };
-}
-
-function evaluateBestHand(cards) {
-  if (!cards || cards.length < 5) return { score: 0, name: "—", bestCards: [] };
-  let best = { score: -1, name: "Carta Alta", bestCards: [] };
-  const n = cards.length;
-  for (let a = 0; a < n - 4; a++)
-    for (let b = a + 1; b < n - 3; b++)
-      for (let c = b + 1; c < n - 2; c++)
-        for (let d = c + 1; d < n - 1; d++)
-          for (let e = d + 1; e < n; e++) {
-            const combo = [cards[a], cards[b], cards[c], cards[d], cards[e]];
-            const res = scoreFiveCards(combo);
-            if (res.score > best.score) {
-              best = { score: res.score, name: res.name, bestCards: combo };
-            }
-          }
-  return best;
-}
-
-function buildSidePots(players) {
-  const contributors = (players || []).filter(p => p.totalBet > 0);
-  if (contributors.length === 0) return [];
-
-  const levels = [...new Set(contributors.map(p => p.totalBet))].sort((a, b) => a - b);
-  const pots = [];
-  let prevLevel = 0;
-
-  for (const level of levels) {
-    const slice = level - prevLevel;
-    if (slice <= 0) continue;
-
-    let amount = 0;
-    const eligibleIds = [];
-    for (const p of contributors) {
-      if (p.totalBet >= level) {
-        amount += slice;
-        if (!p.folded) eligibleIds.push(p.id);
-      }
-    }
-
-    if (amount > 0) {
-      const lastPot = pots[pots.length - 1];
-      const sameEligible =
-        lastPot &&
-        lastPot.eligibleIds.length === eligibleIds.length &&
-        lastPot.eligibleIds.every((id, idx) => id === eligibleIds[idx]);
-
-      if (sameEligible) {
-        lastPot.amount += amount;
-      } else {
-        pots.push({ amount, eligibleIds });
-      }
-    }
-    prevLevel = level;
-  }
-
-  return pots;
-}
-
-/* ============================================================================
-   5. NORMALIZAÇÃO DO ESTADO (CORRIGE ARRAYS VAZIOS APAGADOS PELO FIREBASE)
-   ============================================================================ */
-function normalizeRoomState(raw) {
-  if (!raw) return null;
-  const playersArr = Array.isArray(raw.players)
-    ? raw.players
-    : Object.values(raw.players || {});
-
-  return {
-    hostId: raw.hostId || "",
-    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
-    handId: Number(raw.handId) || 0,
-    phase: raw.phase || "WAITING",
-    pot: Number(raw.pot) || 0,
-    currentBet: Number(raw.currentBet) || 0,
-    minRaise: Number(raw.minRaise) || BIG_BLIND,
-    dealerIndex: Number(raw.dealerIndex) || 0,
-    turnIndex: raw.turnIndex !== undefined ? Number(raw.turnIndex) : -1,
-    turnDeadline: Number(raw.turnDeadline) || 0,
-    nextHandDeadline: Number(raw.nextHandDeadline) || 0,
-    isRunout: Boolean(raw.isRunout),
-    runoutDeadline: Number(raw.runoutDeadline) || 0,
-    lastEvent: raw.lastEvent || null,
-    winnerIds: Array.isArray(raw.winnerIds) ? raw.winnerIds : Object.values(raw.winnerIds || {}),
-    winningHandName: raw.winningHandName || "",
-    winningCards: Array.isArray(raw.winningCards) ? raw.winningCards : Object.values(raw.winningCards || {}),
-    deck: Array.isArray(raw.deck) ? raw.deck : Object.values(raw.deck || {}),
-    community: Array.isArray(raw.community) ? raw.community : Object.values(raw.community || {}),
-    message: raw.message || "",
-    players: playersArr.filter(Boolean).map(p => ({
-      id: p.id,
-      name: p.name || "Jogador",
-      chips: Number(p.chips) || 0,
-      handStartChips: p.handStartChips !== undefined ? Number(p.handStartChips) : (Number(p.chips) || 0),
-      bet: Number(p.bet) || 0,
-      totalBet: Number(p.totalBet) || 0,
-      hand: Array.isArray(p.hand) ? p.hand : Object.values(p.hand || {}),
-      folded: Boolean(p.folded),
-      allIn: Boolean(p.allIn),
-      acted: Boolean(p.acted),
-      participated: Boolean(p.participated),
-      isBot: Boolean(p.isBot),
-      status: p.status || ""
-    }))
-  };
-}
-
-/* ============================================================================
-   6. ESTADO LOCAL, SINCRONIZAÇÃO E MOTOR DE TIMERS
+   2. ESTADO LOCAL, SINCRONIZAÇÃO, TIMERS E BOTS
    ============================================================================ */
 let localMode = true;
-let myId = "p_" + Math.random().toString(36).slice(2, 8);
+const myId = "p_" + Math.random().toString(36).slice(2, 8);
 let myName = "Jogador";
 let currentRoomCode = null;
 let roomState = null;
@@ -470,49 +84,6 @@ let lastSliderTurnKey = "";
 let trackedHandId = 0;
 let handSettled = false;
 
-function generateRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 5; i++) code += chars[secureRandomInt(chars.length)];
-  return code;
-}
-
-function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIPS) {
-  return {
-    hostId,
-    tableLedIndex: pickNextLedIndex(),
-    handId: 0,
-    phase: "WAITING",
-    pot: 0,
-    currentBet: 0,
-    minRaise: BIG_BLIND,
-    dealerIndex: 0,
-    turnIndex: -1,
-    turnDeadline: 0,
-    nextHandDeadline: 0,
-    isRunout: false,
-    runoutDeadline: 0,
-    lastEvent: null,
-    winnerIds: [],
-    winningHandName: "",
-    winningCards: [],
-    deck: [],
-    community: [],
-    message: "A aguardar jogadores... Partilha o código da sala!",
-    players: [
-      {
-        id: hostId, name: hostName, chips: initialChips, handStartChips: initialChips,
-        bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
-        participated: false, isBot: false, status: "PRONTO"
-      }
-    ]
-  };
-}
-
-function setSoundEvent(state, type) {
-  state.lastEvent = { type, ts: Date.now() + Math.random() };
-}
-
 async function syncState(newState) {
   const clean = normalizeRoomState(newState);
   roomState = clean;
@@ -524,41 +95,130 @@ async function syncState(newState) {
     try {
       await set(ref(db, `rooms/${currentRoomCode}`), clean);
     } catch (err) {
-      console.error("Erro ao sincronizar estado com Firebase:", err);
+      console.error("Erro ao sincronizar estado:", err);
     } finally {
       isSyncingAction = false;
     }
   }
 }
 
-function startTimerLoop() {
-  stopTimerLoop();
-  timerInterval = setInterval(tickTimers, 100);
+function startNewHand() {
+  if (!roomState) return;
+  syncState(buildNewHandState(roomState));
 }
 
-function stopTimerLoop() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
+function handleAction(playerId, action, raiseTo = 0, isTimeout = false) {
+  if (isSyncingAction && !isTimeout) return;
+  const next = applyActionToState(roomState, playerId, action, raiseTo, isTimeout);
+  if (next) syncState(next);
+}
+
+function startNewMatchReset() {
+  if (!roomState || roomState.hostId !== myId) return;
+  const user = getCurrentUser();
+  const myStack = user ? Math.min(STARTING_CHIPS, user.balance) : STARTING_CHIPS;
+  const s = normalizeRoomState(structuredClone(roomState));
+  s.players.forEach(p => {
+    const stack = p.id === myId ? myStack : STARTING_CHIPS;
+    p.chips = stack;
+    p.handStartChips = stack;
+    p.bet = 0;
+    p.totalBet = 0;
+    p.folded = false;
+    p.allIn = false;
+    p.acted = false;
+    p.participated = false;
+    p.status = "PRONTO";
+  });
+  roomState = s;
+  startNewHand();
+}
+
+async function performRebuy() {
+  if (!roomState) return;
+  const myIdx = roomState.players.findIndex(p => p.id === myId);
+  if (myIdx < 0 || roomState.players[myIdx].chips > 0) return;
+
+  const user = getCurrentUser();
+  const rebuyAmount = user ? Math.min(STARTING_CHIPS, user.balance) : STARTING_CHIPS;
+  if (rebuyAmount < BIG_BLIND) return;
+
+  const inActiveHand = roomState.phase !== "WAITING" && roomState.phase !== "SHOWDOWN";
+  const newStatus = inActiveHand ? "REBUY (PRÓX. MÃO)" : "REBUY";
+  const meName = roomState.players[myIdx].name;
+
+  if (localMode) {
+    const s = normalizeRoomState(structuredClone(roomState));
+    s.players[myIdx].chips = rebuyAmount;
+    s.players[myIdx].handStartChips = rebuyAmount;
+    s.players[myIdx].status = newStatus;
+    if (!inActiveHand) {
+      s.players[myIdx].folded = false;
+      const alive = s.players.filter(pl => pl.chips > 0).length;
+      if (s.phase === "SHOWDOWN" && alive >= 2 && s.nextHandDeadline === 0) {
+        s.nextHandDeadline = Date.now() + 3000;
+        s.message = `${meName} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
+      }
+    }
+    setSoundEvent(s, "chip");
+    syncState(s);
+  } else if (db && currentRoomCode) {
+    const updates = {
+      [`players/${myIdx}/chips`]: rebuyAmount,
+      [`players/${myIdx}/handStartChips`]: rebuyAmount,
+      [`players/${myIdx}/status`]: newStatus
+    };
+    if (!inActiveHand) {
+      updates[`players/${myIdx}/folded`] = false;
+      const aliveAfter = roomState.players.filter((pl, idx) => (idx === myIdx ? true : pl.chips > 0)).length;
+      if (roomState.phase === "SHOWDOWN" && aliveAfter >= 2 && roomState.nextHandDeadline === 0) {
+        updates["nextHandDeadline"] = Date.now() + 3000;
+        updates["message"] = `${meName} fez Rebuy (+${rebuyAmount}€)! Nova mão a começar...`;
+      }
+    }
+    SoundEngine.chip();
+    await update(ref(db, `rooms/${currentRoomCode}`), updates);
   }
 }
+
+function maybeTriggerBotTurn() {
+  if (!localMode || !roomState || roomState.isRunout || roomState.turnIndex < 0) return;
+  const current = roomState.players[roomState.turnIndex];
+  if (!current || !current.isBot) return;
+
+  setTimeout(() => {
+    if (!roomState || roomState.isRunout || roomState.turnIndex < 0) return;
+    const p = roomState.players[roomState.turnIndex];
+    if (!p || !p.isBot) return;
+    const toCall = roomState.currentBet - p.bet;
+    const roll = secureRandomInt(100);
+    if (toCall === 0) {
+      if (roll < 75) handleAction(p.id, "check-call");
+      else handleAction(p.id, "raise", roomState.currentBet + BIG_BLIND * 2);
+    } else {
+      if (roll < 25 && toCall > BIG_BLIND * 2) handleAction(p.id, "fold");
+      else if (roll < 85) handleAction(p.id, "check-call");
+      else handleAction(p.id, "raise", roomState.currentBet + BIG_BLIND * 2);
+    }
+  }, 900 + secureRandomInt(900));
+}
+
+function startTimerLoop() { stopTimerLoop(); timerInterval = setInterval(tickTimers, 100); }
+function stopTimerLoop() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
 
 function tickTimers() {
   if (!roomState) return;
   const now = Date.now();
   const isHost = roomState.hostId === myId;
 
-  // 1. Run-out progressivo de All-In
   if (roomState.isRunout && roomState.runoutDeadline > 0) {
     if (now >= roomState.runoutDeadline && isHost && lastHandledRunoutDeadline !== roomState.runoutDeadline) {
       lastHandledRunoutDeadline = roomState.runoutDeadline;
-      const nextState = normalizeRoomState(structuredClone(roomState));
-      advancePhase(nextState);
+      syncState(advancePhaseOnState(roomState));
     }
     return;
   }
 
-  // 2. Temporizador de Jogada Ativa (Anel Circular)
   if (roomState.turnIndex >= 0 && roomState.turnDeadline > 0) {
     const remainingMs = Math.max(0, roomState.turnDeadline - now);
     const pct = Math.min(100, (remainingMs / TURN_DURATION_MS) * 100);
@@ -574,46 +234,527 @@ function tickTimers() {
       textEl.textContent = `${secs}s`;
       textEl.classList.toggle("urgent", secs <= 5);
     }
-
     if (secs >= 1 && secs <= 5) {
-      const tickKey = `${roomState.turnDeadline}_${secs}`;
-      if (lastTickKey !== tickKey) {
-        lastTickKey = tickKey;
-        SoundEngine.tick(secs <= 2);
-      }
+      const k = `${roomState.turnDeadline}_${secs}`;
+      if (lastTickKey !== k) { lastTickKey = k; SoundEngine.tick(secs <= 2); }
     }
-
     if (remainingMs === 0 && isHost && lastHandledTurnDeadline !== roomState.turnDeadline) {
       lastHandledTurnDeadline = roomState.turnDeadline;
       const activePlayer = roomState.players[roomState.turnIndex];
       if (activePlayer) {
-        const canCheck = roomState.currentBet - activePlayer.bet === 0;
-        handleAction(activePlayer.id, canCheck ? "check-call" : "fold", 0, true);
+        handleAction(activePlayer.id, roomState.currentBet - activePlayer.bet === 0 ? "check-call" : "fold", 0, true);
       }
     }
   }
 
-  // 3. Temporizador Automático (Início da Sala após 2.º jogador OU Próxima Mão)
   const nextPill = $("next-hand-countdown");
-  const isWaitingCountdown =
-    roomState.phase === "WAITING" &&
-    roomState.nextHandDeadline > 0 &&
-    roomState.players &&
-    roomState.players.length >= 2;
-  const isShowdownCountdown =
-    roomState.phase === "SHOWDOWN" &&
-    roomState.nextHandDeadline > 0;
+  const isWait = roomState.phase === "WAITING" && roomState.nextHandDeadline > 0 && roomState.players.length >= 2;
+  const isShow = roomState.phase === "SHOWDOWN" && roomState.nextHandDeadline > 0;
 
-  if ((isWaitingCountdown || isShowdownCountdown) && nextPill) {
+  if ((isWait || isShow) && nextPill) {
     const remainingMs = Math.max(0, roomState.nextHandDeadline - now);
     const secs = Math.ceil(remainingMs / 1000);
-
-    nextPill.textContent = isWaitingCountdown ? `Começa em ${secs}s` : `Nova mão em ${secs}s`;
+    nextPill.textContent = isWait ? `Começa em ${secs}s` : `Nova mão em ${secs}s`;
     nextPill.classList.remove("hidden");
 
-    if (isWaitingCountdown) {
-      const msgEl = $("table-message");
-      if (msgEl) {
-        msgEl.textContent = `Jogadores na mesa (${roomState.players.length}/${MAX_PLAYERS}) — O jogo começa em ${secs}s!`;
+    if (isWait) {
+      if ($("table-message")) $("table-message").textContent = `Jogadores na mesa (${roomState.players.length}/${MAX_PLAYERS}) — O jogo começa em ${secs}s!`;
+      if (secs >= 1 && secs <= 3) {
+        const k = `start_${roomState.nextHandDeadline}_${secs}`;
+        if (lastTickKey !== k) { lastTickKey = k; SoundEngine.tick(secs === 1); }
       }
-      if (secs >= 1 &
+    }
+    if (remainingMs === 0 && isHost && lastHandledNextHandDeadline !== roomState.nextHandDeadline) {
+      lastHandledNextHandDeadline = roomState.nextHandDeadline;
+      startNewHand();
+    }
+  } else if (nextPill) {
+    nextPill.classList.add("hidden");
+  }
+}
+
+/* ============================================================================
+   3. SALDO E RENDERIZAÇÃO DA INTERFACE (ZYNGA + 3D LED + SHOWDOWN)
+   ============================================================================ */
+function settleHandBalanceIfNeeded(forceLeave = false) {
+  if (!roomState || !getCurrentUser()) return;
+  const handId = Number(roomState.handId) || 0;
+  if (handId <= 0) return;
+
+  if (handId !== trackedHandId) { trackedHandId = handId; handSettled = false; }
+  if (handSettled) return;
+
+  const me = (roomState.players || []).find(p => p.id === myId);
+  if (!me || !me.participated) { if (me && !me.participated) handSettled = true; return; }
+
+  const isShowdown = roomState.phase === "SHOWDOWN";
+  if (!isShowdown && !me.folded && !forceLeave) return;
+
+  handSettled = true;
+  const delta = me.chips - (Number(me.handStartChips) || 0);
+  const won = isShowdown && (roomState.winnerIds || []).includes(myId);
+  if (forceLeave && delta === 0) return;
+  applyBalanceDelta(delta, { won, countHand: true });
+}
+
+function renderPotChipsHTML(amount) {
+  if (!amount || amount <= 0) return "";
+  const denoms = [
+    { v: 500, c: "chip-500" }, { v: 100, c: "chip-100" },
+    { v: 25, c: "chip-25" }, { v: 10, c: "chip-10" }, { v: 5, c: "chip-5" }
+  ];
+  let rem = amount, html = "";
+  for (const d of denoms) {
+    const count = Math.min(6, Math.floor(rem / d.v));
+    rem %= d.v;
+    if (count > 0) html += `<div class="chip-stack">${`<div class="poker-chip ${d.c}"></div>`.repeat(count)}</div>`;
+  }
+  return html;
+}
+
+function renderCardHTML(card, hidden = false, small = false, hl = "") {
+  const sc = small ? "small" : "";
+  if (hidden || !card) return `<div class="card back ${sc}"><div class="card-back-inner"><span class="card-back-emblem">❄</span></div></div>`;
+  const red = card.suit === "♥" || card.suit === "♦" ? "red" : "";
+  return `
+    <div class="card ${red} ${sc} ${hl}">
+      <div class="card-corner top"><span class="card-rank">${card.label}</span><span class="card-suit-mini">${card.suit}</span></div>
+      <div class="card-center">${card.suit}</div>
+      <div class="card-corner bottom"><span class="card-rank">${card.label}</span><span class="card-suit-mini">${card.suit}</span></div>
+    </div>`;
+}
+
+function renderGame() {
+  if (!roomState) return;
+  applyTableLedTheme(roomState.tableLedIndex);
+
+  if (roomState.lastEvent && roomState.lastEvent.ts !== lastPlayedEventTs) {
+    lastPlayedEventTs = roomState.lastEvent.ts;
+    SoundEngine.playEvent(roomState.lastEvent.type);
+  }
+
+  const players = roomState.players || [];
+  const community = roomState.community || [];
+  const isShowdown = roomState.phase === "SHOWDOWN";
+  const isWaiting = roomState.phase === "WAITING";
+  const winCardsSet = new Set(roomState.winningCards || []);
+  const winnerIdsSet = new Set(roomState.winnerIds || []);
+  const hasCardHighlights = isShowdown && winCardsSet.size > 0;
+
+  const tableEl = document.querySelector(".poker-table");
+  const visibleSeats = players.length > 5 ? 6 : 5;
+  if (tableEl) tableEl.classList.toggle("six-players", visibleSeats === 6);
+
+  if ($("display-room-code")) $("display-room-code").textContent = currentRoomCode || "DEMO";
+  if ($("display-phase")) $("display-phase").textContent = isWaiting ? "A AGUARDAR" : roomState.phase;
+  if ($("pot-amount")) $("pot-amount").textContent = roomState.pot;
+  if ($("pot-chips")) $("pot-chips").innerHTML = renderPotChipsHTML(roomState.pot);
+  if ($("table-message")) $("table-message").textContent = roomState.message;
+
+  const waitingPill = $("waiting-room-pill");
+  if (waitingPill) {
+    const showCode = isWaiting && !localMode && Boolean(currentRoomCode);
+    waitingPill.classList.toggle("hidden", !showCode);
+    if (showCode && $("waiting-room-code")) $("waiting-room-code").textContent = currentRoomCode;
+  }
+
+  const sidePotsEl = $("side-pots-display");
+  if (sidePotsEl) {
+    const hasAllIn = players.some(p => !p.folded && p.allIn);
+    const sp = hasAllIn ? buildSidePots(players) : [];
+    if (hasAllIn && sp.length > 1 && !isWaiting) {
+      sidePotsEl.innerHTML = sp.map((x, i) => `<span class="side-pot-tag">${i === 0 ? "Principal" : `Side ${i}`}: ${x.amount}€</span>`).join("");
+      sidePotsEl.classList.remove("hidden");
+    } else sidePotsEl.classList.add("hidden");
+  }
+
+  const isHost = roomState.hostId === myId;
+  const funded = players.filter(p => p.chips > 0).length;
+  if ($("btn-start-game")) {
+    $("btn-start-game").classList.toggle("hidden", !(isHost && funded >= 2 && (isWaiting || isShowdown)));
+    $("btn-start-game").textContent = isShowdown ? "Saltar Espera" : "Começar Já";
+  }
+  if ($("btn-new-match")) $("btn-new-match").classList.toggle("hidden", !(isHost && isShowdown && funded < 2));
+
+  if ($("community-cards")) {
+    $("community-cards").innerHTML = community.map(c =>
+      renderCardHTML(c, false, false, hasCardHighlights ? (winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
+    ).join("");
+  }
+
+  const bannerEl = $("winning-hand-banner");
+  if (bannerEl) {
+    if (isShowdown && roomState.winningHandName) {
+      bannerEl.textContent = roomState.winningHandName.toUpperCase();
+      bannerEl.classList.remove("hidden");
+    } else bannerEl.classList.add("hidden");
+  }
+
+  const myIndex = players.findIndex(p => p.id === myId);
+  const offset = myIndex >= 0 ? myIndex : 0;
+
+  for (let seatVisual = 0; seatVisual < MAX_PLAYERS; seatVisual++) {
+    const el = document.querySelector(`.seat-${seatVisual}`);
+    if (!el) continue;
+    if (seatVisual >= visibleSeats) { el.className = `seat seat-${seatVisual} empty`; el.innerHTML = ""; continue; }
+
+    const pIdx = seatVisual < players.length ? (seatVisual + offset) % players.length : -1;
+    const p = pIdx >= 0 ? players[pIdx] : null;
+    if (!p) {
+      el.className = `seat seat-${seatVisual} empty`;
+      el.innerHTML = `<div class="seat-ring"><div class="seat-circle"><span class="seat-empty-label">Livre</span></div></div>`;
+      continue;
+    }
+
+    const isMe = p.id === myId;
+    const isTurn = roomState.turnIndex === pIdx;
+    const isWinner = isShowdown && winnerIdsSet.has(p.id);
+    const inHand = !p.folded && p.hand && p.hand.length === 2;
+    const showCards = isMe || (roomState.isRunout && !p.folded) || (isShowdown && !p.folded && hasCardHighlights);
+
+    el.className = `seat seat-${seatVisual} ${isMe ? "is-me" : ""} ${inHand ? "has-cards" : ""} ${isTurn ? "active-turn" : ""} ${isWinner ? "is-winner" : ""} ${p.folded ? "folded" : ""}`;
+
+    const betPill = p.bet > 0 ? `<div class="bet-pill"><span class="mini-chip"></span>${p.bet} €</div>` : "";
+    const ringInner = `
+      ${roomState.dealerIndex === pIdx && !isWaiting ? `<div class="dealer-chip" title="Botão Dealer">D</div>` : ""}
+      ${isTurn ? `<span class="turn-timer-text" id="active-timer-text">20s</span>` : ""}
+      <div class="seat-circle"><div class="seat-name" title="${p.name}">${p.name}</div>${isMe ? `<div class="seat-you-tag">TU</div>` : ""}</div>
+      ${isWinner ? `<div class="winner-badge">WINNER</div>` : ""}`;
+
+    if (isMe) {
+      const heroCards = inHand ? `<div class="hero-cards">${p.hand.map(c =>
+        renderCardHTML(c, false, false, hasCardHighlights ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
+      ).join("")}</div>` : "";
+      el.innerHTML = `
+        <div class="seat-avatar-stack">
+          ${betPill ? `<div class="hero-bet-zone">${betPill}</div>` : ""}
+          <div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div>
+          ${heroCards}
+        </div>
+        <div class="seat-chips">${p.chips} €</div>
+        ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
+    } else {
+      const oppCards = inHand ? `<div class="opp-cards ${showCards ? "revealed" : ""}">${p.hand.map(c =>
+        renderCardHTML(c, !showCards, !showCards, (hasCardHighlights && showCards) ? (isWinner && winCardsSet.has(cardKey(c)) ? "card-win" : "card-dim") : "")
+      ).join("")}</div>` : "";
+      el.innerHTML = `
+        ${(oppCards || betPill) ? `<div class="seat-felt-zone">${oppCards}${betPill}</div>` : ""}
+        <div class="seat-avatar-stack"><div class="seat-ring" ${isTurn ? 'id="active-timer-ring"' : ""}>${ringInner}</div></div>
+        <div class="seat-chips">${p.chips} €</div>
+        ${p.status ? `<div class="seat-status">${p.status}</div>` : ""}`;
+    }
+  }
+
+  const me = players[myIndex];
+  const user = getCurrentUser();
+  if ($("btn-rebuy")) {
+    const okRebuy = Boolean(me && me.chips === 0 && (!user || user.balance >= BIG_BLIND) && (me.folded || isShowdown || isWaiting));
+    $("btn-rebuy").classList.toggle("hidden", !okRebuy);
+  }
+  if ($("hand-strength-badge")) {
+    if (me && !me.folded && me.hand?.length === 2) {
+      const all = [...me.hand, ...community];
+      $("hand-strength-badge").textContent = `A tua mão: ${all.length >= 5 ? evaluateBestHand(all).name : "Pré-Flop"}`;
+    } else $("hand-strength-badge").textContent = "A tua mão: —";
+  }
+
+  const isMyTurn = Boolean(me && !roomState.isRunout && roomState.turnIndex === myIndex && !me.folded && !me.allIn);
+  if (isMyTurn && !wasMyTurn) setTimeout(() => SoundEngine.myTurn(), 180);
+  wasMyTurn = isMyTurn;
+  if ($("action-bar")) $("action-bar").classList.toggle("disabled", !isMyTurn);
+
+  if (isMyTurn) {
+    const toCall = Math.max(0, roomState.currentBet - me.bet);
+    const callAmt = Math.min(toCall, me.chips);
+    if ($("btn-check-call")) {
+      $("btn-check-call").textContent = toCall === 0 ? "Check" : (callAmt >= me.chips ? `Call All-In (${callAmt}€)` : `Call ${callAmt}€`);
+    }
+    const maxR = me.bet + me.chips;
+    const canR = me.chips > toCall;
+    const minR = Math.min(maxR, roomState.currentBet + roomState.minRaise);
+    const slider = $("raise-slider");
+    if (slider) slider.disabled = !canR;
+    if ($("btn-raise")) $("btn-raise").disabled = !canR;
+    if ($("raise-row")) $("raise-row").classList.toggle("disabled-raise", !canR);
+
+    const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
+    if (slider && lastSliderTurnKey !== turnKey) {
+      lastSliderTurnKey = turnKey;
+      slider.step = (maxR - minR) % 10 === 0 ? 10 : 1;
+      slider.min = minR;
+      slider.max = maxR;
+      slider.value = minR;
+      if ($("raise-value")) $("raise-value").textContent = minR;
+    }
+  }
+
+  settleHandBalanceIfNeeded(false);
+  tickTimers();
+}
+
+/* ============================================================================
+   4. AUTENTICAÇÃO, LOBBY E CONTROLOS
+   ============================================================================ */
+function openGameScreen() {
+  trackedHandId = 0; handSettled = false;
+  if ($("lobby-screen")) $("lobby-screen").classList.remove("active");
+  if ($("game-screen")) $("game-screen").classList.add("active");
+  startTimerLoop();
+}
+function showError(msg) { if ($("lobby-error")) $("lobby-error").textContent = msg; }
+
+function getLoggedBuyInOrError() {
+  const user = getCurrentUser();
+  if (!user) { showError("Inicia sessão primeiro."); return null; }
+  if (user.balance < BIG_BLIND) { showError(`Saldo insuficiente (${formatEuro(user.balance)}).`); return null; }
+  return { name: user.username, buyIn: Math.min(STARTING_CHIPS, user.balance) };
+}
+
+let authMode = "login";
+function setAuthMode(mode) {
+  authMode = mode;
+  if ($("tab-login")) $("tab-login").classList.toggle("active", mode === "login");
+  if ($("tab-register")) $("tab-register").classList.toggle("active", mode === "register");
+  if ($("btn-auth-submit")) $("btn-auth-submit").textContent = mode === "login" ? "Entrar" : "Criar Conta (+100 000 €)";
+  if ($("auth-hint")) $("auth-hint").classList.toggle("hidden", mode !== "register");
+  if ($("auth-error")) $("auth-error").textContent = "";
+}
+
+function renderAuthUI(user) {
+  const logged = Boolean(user);
+  if ($("auth-panel")) $("auth-panel").classList.toggle("hidden", logged);
+  if ($("play-panel")) $("play-panel").classList.toggle("hidden", !logged);
+  if (logged) {
+    myName = user.username;
+    if ($("profile-username")) $("profile-username").textContent = user.username;
+    if ($("profile-balance")) $("profile-balance").textContent = formatEuro(user.balance);
+    if ($("profile-stats")) $("profile-stats").textContent = `${user.handsPlayed} mãos • ${user.handsWon} vitórias`;
+  }
+}
+
+async function handleAuthSubmit() {
+  SoundEngine.init();
+  const errEl = $("auth-error"), btn = $("btn-auth-submit");
+  if (errEl) errEl.textContent = "";
+  const prevText = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = authMode === "login" ? "A entrar..." : "A criar conta..."; }
+  try {
+    const u = $("auth-username")?.value || "", p = $("auth-pin")?.value || "";
+    if (authMode === "login") await loginUser(u, p);
+    else await registerUser(u, p);
+    if ($("auth-pin")) $("auth-pin").value = "";
+  } catch (err) {
+    if (errEl) errEl.textContent = err?.message || "Erro na autenticação.";
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prevText; }
+  }
+}
+
+on("tab-login", "click", () => setAuthMode("login"));
+on("tab-register", "click", () => setAuthMode("register"));
+on("auth-pin", "input", (e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); });
+on("btn-auth-submit", "click", handleAuthSubmit);
+on("auth-pin", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); handleAuthSubmit(); } });
+on("btn-logout", "click", () => { logoutUser(); setAuthMode("login"); });
+
+setAuthMode("login");
+initUserSystem(db, renderAuthUI);
+restoreSession();
+
+function subscribeToRoom(code) {
+  if (unsubscribeRoom) unsubscribeRoom();
+  unsubscribeRoom = onValue(ref(db, `rooms/${code}`), (snap) => {
+    if (!snap.exists()) return;
+    roomState = normalizeRoomState(snap.val());
+    if (roomState.hostId === myId && roomState.phase === "WAITING" && roomState.players.length >= 2 && !roomState.nextHandDeadline) {
+      update(ref(db, `rooms/${code}`), {
+        nextHandDeadline: Date.now() + AUTO_START_DELAY_MS,
+        message: `Jogadores na mesa (${roomState.players.length}/${MAX_PLAYERS}) — O jogo começa em 10s!`
+      });
+    }
+    renderGame();
+  });
+}
+
+on("btn-create-room", "click", async () => {
+  SoundEngine.init(); showError("");
+  if (!isFirebaseConfigured || !db) return showError("Firebase não configurado.");
+  const entry = getLoggedBuyInOrError(); if (!entry) return;
+  const btn = $("btn-create-room"), prev = btn.textContent;
+  btn.disabled = true; btn.textContent = "A criar sala...";
+  try {
+    myName = entry.name; localMode = false; currentRoomCode = generateRoomCode();
+    const initial = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
+    await withTimeout(set(ref(db, `rooms/${currentRoomCode}`), initial));
+    roomState = initial; openGameScreen(); renderGame(); subscribeToRoom(currentRoomCode);
+  } catch (err) {
+    showError(String(err?.message || err));
+  } finally { btn.disabled = false; btn.textContent = prev; }
+});
+
+on("btn-join-room", "click", async () => {
+  SoundEngine.init(); showError("");
+  if (!isFirebaseConfigured || !db) return showError("Firebase não configurado.");
+  const entry = getLoggedBuyInOrError(); if (!entry) return;
+  const code = ($("room-code")?.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!code) return showError("Introduz o código da sala.");
+  const btn = $("btn-join-room"), prev = btn.textContent;
+  btn.disabled = true; btn.textContent = "A entrar...";
+  try {
+    const snap = await withTimeout(get(ref(db, `rooms/${code}`)));
+    if (!snap.exists()) return showError(`Sala "${code}" não encontrada.`);
+    const data = normalizeRoomState(snap.val());
+    if (data.players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
+    myName = entry.name; localMode = false; currentRoomCode = code;
+    data.players.push({
+      id: myId, name: myName, chips: entry.buyIn, handStartChips: entry.buyIn,
+      bet: 0, totalBet: 0, hand: [], folded: data.phase !== "WAITING",
+      allIn: false, acted: false, participated: false, isBot: false,
+      status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
+    });
+    await withTimeout(update(ref(db, `rooms/${code}`), { players: data.players }));
+    roomState = data; subscribeToRoom(code); openGameScreen(); renderGame();
+  } catch (err) {
+    showError(String(err?.message || err));
+  } finally { btn.disabled = false; btn.textContent = prev; }
+});
+
+on("room-code", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-join-room")?.click(); } });
+
+on("btn-demo-mode", "click", () => {
+  SoundEngine.init(); showError("");
+  const entry = getLoggedBuyInOrError(); if (!entry) return;
+  myName = entry.name; localMode = true; currentRoomCode = "OFFLINE";
+  const demo = createInitialRoom(myId, myName, entry.buyIn, pickNextLedIndex());
+  ["Tiago", "Marta", "Rui", "Inês"].forEach((name, i) => demo.players.push({
+    id: `bot_${i}`, name, chips: STARTING_CHIPS, handStartChips: STARTING_CHIPS,
+    bet: 0, totalBet: 0, hand: [], folded: false, allIn: false, acted: false,
+    participated: false, isBot: true, status: ""
+  }));
+  roomState = demo; openGameScreen(); startNewHand();
+});
+
+function setQuickRaise(mode) {
+  const me = roomState?.players.find(p => p.id === myId), slider = $("raise-slider");
+  if (!me || !slider || slider.disabled) return;
+  const minR = Number(slider.min), maxR = Number(slider.max);
+  const potAfter = roomState.pot + Math.max(0, roomState.currentBet - me.bet);
+  let target = minR;
+  if (mode === "half") target = Math.round((roomState.currentBet + potAfter * 0.5) / 10) * 10;
+  else if (mode === "pot") target = Math.round((roomState.currentBet + potAfter) / 10) * 10;
+  target = Math.max(minR, Math.min(maxR, target));
+  slider.value = target;
+  if ($("raise-value")) $("raise-value").textContent = target;
+}
+
+const copyCode = (e) => {
+  if (!currentRoomCode) return;
+  navigator.clipboard?.writeText(currentRoomCode).catch(() => {});
+  const btn = e.currentTarget, prev = btn.textContent;
+  btn.textContent = "Copiado ✓";
+  setTimeout(() => { btn.textContent = prev; }, 1400);
+};
+
+on("btn-start-game", "click", startNewHand);
+on("btn-new-match", "click", startNewMatchReset);
+on("btn-rebuy", "click", performRebuy);
+on("btn-fold", "click", () => handleAction(myId, "fold"));
+on("btn-check-call", "click", () => handleAction(myId, "check-call"));
+on("btn-raise", "click", () => handleAction(myId, "raise", Number($("raise-slider")?.value || 0)));
+on("btn-allin", "click", () => handleAction(myId, "allin"));
+on("raise-slider", "input", (e) => { if ($("raise-value")) $("raise-value").textContent = e.target.value; });
+on("btn-bet-min", "click", () => setQuickRaise("min"));
+on("btn-bet-half", "click", () => setQuickRaise("half"));
+on("btn-bet-pot", "click", () => setQuickRaise("pot"));
+on("btn-copy-code", "click", copyCode);
+on("btn-waiting-copy", "click", copyCode);
+
+on("btn-leave", "click", () => {
+  if (!localMode && roomState && roomState.turnIndex >= 0 && roomState.players[roomState.turnIndex]?.id === myId) {
+    handleAction(myId, "fold");
+  }
+  settleHandBalanceIfNeeded(true);
+  trackedHandId = 0; handSettled = false; stopTimerLoop();
+  if (unsubscribeRoom) unsubscribeRoom();
+  roomState = null; wasMyTurn = false;
+  $("game-screen")?.classList.remove("active");
+  $("lobby-screen")?.classList.add("active");
+  if (document.fullscreenElement || document.webkitFullscreenElement) exitFullscreenMode();
+});
+
+/* ============================================================================
+   5. PWA E FULLSCREEN HORIZONTAL
+   ============================================================================ */
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+
+let deferredInstallPrompt = window.__deferredInstallPrompt || null;
+const installBtn = $("btn-install-app"), iosModal = $("ios-install-modal");
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isMobile = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: fullscreen)").matches || window.navigator.standalone === true;
+
+function syncInstallButton() {
+  if (installBtn && !isStandalone && (deferredInstallPrompt || isIOS || isMobile)) installBtn.classList.remove("hidden");
+}
+syncInstallButton();
+window.addEventListener("hiperbluff:install-ready", () => { deferredInstallPrompt = window.__deferredInstallPrompt; syncInstallButton(); });
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstallPrompt = e; window.__deferredInstallPrompt = e; syncInstallButton(); });
+window.addEventListener("appinstalled", () => { deferredInstallPrompt = null; window.__deferredInstallPrompt = null; installBtn?.classList.add("hidden"); });
+
+on("btn-install-app", "click", async () => {
+  const p = deferredInstallPrompt || window.__deferredInstallPrompt;
+  if (p) {
+    p.prompt();
+    const { outcome } = await p.userChoice;
+    if (outcome === "accepted") installBtn?.classList.add("hidden");
+    deferredInstallPrompt = null; window.__deferredInstallPrompt = null;
+  } else if (isIOS && iosModal) iosModal.classList.remove("hidden");
+  else showError("No Chrome, toca no menu (⋮) e escolhe \"Instalar aplicação\".");
+});
+on("btn-close-ios-modal", "click", () => iosModal?.classList.add("hidden"));
+iosModal?.addEventListener("click", (e) => { if (e.target === iosModal) iosModal.classList.add("hidden"); });
+
+const fullscreenBtn = $("btn-fullscreen"), rotateHint = $("rotate-hint");
+const canFullscreen = Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+const isInFullscreen = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement || window.matchMedia("(display-mode: fullscreen)").matches);
+const updateFullscreenState = () => document.body.classList.toggle("is-fullscreen", isInFullscreen());
+
+async function enterFullscreenLandscape() {
+  const el = document.documentElement;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: "hide" });
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } catch (_) {}
+  screen.orientation?.lock?.("landscape").catch(() => {});
+  updateFullscreenState();
+}
+
+async function exitFullscreenMode() {
+  try {
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  } catch (_) {}
+  try { screen.orientation?.unlock?.(); } catch (_) {}
+  updateFullscreenState();
+}
+
+if (fullscreenBtn) {
+  if (!canFullscreen) fullscreenBtn.classList.add("hidden");
+  else fullscreenBtn.addEventListener("click", () => isInFullscreen() ? exitFullscreenMode() : enterFullscreenLandscape());
+}
+document.addEventListener("fullscreenchange", updateFullscreenState);
+document.addEventListener("webkitfullscreenchange", updateFullscreenState);
+window.addEventListener("resize", updateFullscreenState);
+updateFullscreenState();
+
+on("btn-rotate-landscape", "click", enterFullscreenLandscape);
+on("btn-dismiss-rotate", "click", () => rotateHint?.classList.add("dismissed"));
+document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300 && !e.target.closest("button, input, a, label")) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+
+/* === FIM DO FICHEIRO game.js === */
