@@ -143,38 +143,49 @@ export function evaluateBestHand(cards) {
   return best;
 }
 
-export function buildSidePots(players) {
+export function buildSidePots(players, deadPot = 0) {
   const contributors = (players || []).filter(p => p.totalBet > 0);
-  if (contributors.length === 0) return [];
-
-  const levels = [...new Set(contributors.map(p => p.totalBet))].sort((a, b) => a - b);
   const pots = [];
-  let prevLevel = 0;
 
-  for (const level of levels) {
-    const slice = level - prevLevel;
-    if (slice <= 0) continue;
+  if (contributors.length > 0) {
+    const levels = [...new Set(contributors.map(p => p.totalBet))].sort((a, b) => a - b);
+    let prevLevel = 0;
 
-    let amount = 0;
-    const eligibleIds = [];
-    for (const p of contributors) {
-      if (p.totalBet >= level) {
-        amount += slice;
-        if (!p.folded) eligibleIds.push(p.id);
+    for (const level of levels) {
+      const slice = level - prevLevel;
+      if (slice <= 0) continue;
+
+      let amount = 0;
+      const eligibleIds = [];
+      for (const p of contributors) {
+        if (p.totalBet >= level) {
+          amount += slice;
+          if (!p.folded) eligibleIds.push(p.id);
+        }
       }
-    }
 
-    if (amount > 0) {
-      const lastPot = pots[pots.length - 1];
-      const sameEligible =
-        lastPot &&
-        lastPot.eligibleIds.length === eligibleIds.length &&
-        lastPot.eligibleIds.every((id, idx) => id === eligibleIds[idx]);
+      if (amount > 0) {
+        const lastPot = pots[pots.length - 1];
+        const sameEligible =
+          lastPot &&
+          lastPot.eligibleIds.length === eligibleIds.length &&
+          lastPot.eligibleIds.every((id, idx) => id === eligibleIds[idx]);
 
-      if (sameEligible) lastPot.amount += amount;
-      else pots.push({ amount, eligibleIds });
+        if (sameEligible) lastPot.amount += amount;
+        else pots.push({ amount, eligibleIds });
+      }
+      prevLevel = level;
     }
-    prevLevel = level;
+  }
+
+  const safeDead = Math.max(0, Number(deadPot) || 0);
+  if (safeDead > 0) {
+    if (pots.length > 0) {
+      pots[0].amount += safeDead;
+    } else {
+      const activeIds = (players || []).filter(p => !p.folded).map(p => p.id);
+      if (activeIds.length > 0) pots.push({ amount: safeDead, eligibleIds: activeIds });
+    }
   }
 
   return pots;
@@ -192,6 +203,7 @@ export function normalizeRoomState(raw) {
     handId: Number(raw.handId) || 0,
     phase: raw.phase || "WAITING",
     pot: Number(raw.pot) || 0,
+    deadPot: Number(raw.deadPot) || 0,
     currentBet: Number(raw.currentBet) || 0,
     minRaise: Number(raw.minRaise) || BIG_BLIND,
     dealerIndex: Number(raw.dealerIndex) || 0,
@@ -232,6 +244,7 @@ export function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIP
     handId: 0,
     phase: "WAITING",
     pot: 0,
+    deadPot: 0,
     currentBet: 0,
     minRaise: BIG_BLIND,
     dealerIndex: 0,
@@ -270,6 +283,7 @@ function postBlind(s, idx, amount, label) {
 
 function nextActiveIndex(s, fromIdx) {
   const total = s.players.length;
+  if (total === 0) return -1;
   for (let step = 1; step <= total; step++) {
     const idx = (fromIdx + step) % total;
     const p = s.players[idx];
@@ -309,6 +323,7 @@ export function buildNewHandState(roomState) {
   s.deck = shuffleDeck(createDeck());
   s.community = [];
   s.pot = 0;
+  s.deadPot = 0;
   s.phase = "PREFLOP";
   s.handId = (Number(s.handId) || 0) + 1;
   s.nextHandDeadline = 0;
@@ -389,7 +404,7 @@ function resolveShowdownOnState(s) {
     evalMap.set(p.id, evalRes);
   }
 
-  let pots = buildSidePots(s.players);
+  let pots = buildSidePots(s.players, s.deadPot);
   if (pots.length === 0 && s.pot > 0) {
     pots = [{ amount: s.pot, eligibleIds: contenders.map(p => p.id) }];
   }
@@ -612,6 +627,152 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
   s.turnDeadline = Date.now() + TURN_DURATION_MS;
   s.message = `Vez de ${s.players[s.turnIndex].name}.`;
   setSoundEvent(s, soundType);
+  return s;
+}
+
+export function removePlayerFromState(roomState, playerId, reason = "saiu da mesa", preferredHostId = "") {
+  if (!roomState) return null;
+  const s = normalizeRoomState(structuredClone(roomState));
+  const idx = s.players.findIndex(p => p.id === playerId);
+  if (idx === -1) return null;
+
+  const leaving = s.players[idx];
+  const isActiveHand = s.phase !== "WAITING" && s.phase !== "SHOWDOWN";
+  const wasTheirTurn = isActiveHand && !s.isRunout && s.turnIndex === idx;
+
+  if (isActiveHand && leaving.totalBet > 0) {
+    s.deadPot = (Number(s.deadPot) || 0) + leaving.totalBet;
+  }
+
+  s.players.splice(idx, 1);
+
+  if (s.players.length === 0) {
+    s.hostId = "";
+    s.turnIndex = -1;
+    s.turnDeadline = 0;
+    s.nextHandDeadline = 0;
+    s.isRunout = false;
+    s.runoutDeadline = 0;
+    return s;
+  }
+
+  if (s.hostId === playerId || !s.players.some(p => p.id === s.hostId)) {
+    const chosenHost = preferredHostId && s.players.some(p => p.id === preferredHostId)
+      ? preferredHostId
+      : s.players[0].id;
+    s.hostId = chosenHost;
+  }
+
+  if (idx < s.dealerIndex) {
+    s.dealerIndex -= 1;
+  } else if (idx === s.dealerIndex) {
+    s.dealerIndex = (idx - 1 + s.players.length) % s.players.length;
+  } else if (s.dealerIndex >= s.players.length) {
+    s.dealerIndex = s.players.length - 1;
+  }
+
+  if (s.turnIndex >= 0 && idx < s.turnIndex) {
+    s.turnIndex -= 1;
+  }
+
+  if (s.phase === "WAITING") {
+    if (s.players.length < 2) {
+      s.nextHandDeadline = 0;
+      s.message = `${leaving.name} ${reason}. A aguardar jogadores...`;
+    } else {
+      s.message = `${leaving.name} ${reason}.`;
+    }
+    return s;
+  }
+
+  if (s.phase === "SHOWDOWN") {
+    const funded = s.players.filter(p => p.chips > 0).length;
+    if (funded < 2) {
+      s.nextHandDeadline = 0;
+      s.message = `${leaving.name} ${reason}. A aguardar mais jogadores...`;
+    } else {
+      s.message = `${leaving.name} ${reason}.`;
+    }
+    return s;
+  }
+
+  const remaining = s.players.filter(pl => !pl.folded);
+  if (remaining.length === 0) {
+    s.phase = "WAITING";
+    s.pot = 0;
+    s.deadPot = 0;
+    s.turnIndex = -1;
+    s.turnDeadline = 0;
+    s.nextHandDeadline = 0;
+    s.isRunout = false;
+    s.runoutDeadline = 0;
+    s.message = `${leaving.name} ${reason}. A aguardar jogadores...`;
+    return s;
+  }
+
+  if (remaining.length === 1) {
+    remaining[0].chips += s.pot;
+    s.winnerIds = [remaining[0].id];
+    s.winningHandName = `${remaining[0].name} VENCEU`;
+    s.winningCards = [];
+    s.message = `${leaving.name} ${reason}. ${remaining[0].name} recolhe ${s.pot}€!`;
+    s.phase = "SHOWDOWN";
+    s.turnIndex = -1;
+    s.turnDeadline = 0;
+    s.isRunout = false;
+    s.runoutDeadline = 0;
+    const stillAlive = s.players.filter(pl => pl.chips > 0).length >= 2;
+    s.nextHandDeadline = stillAlive ? Date.now() + NEXT_HAND_DELAY_MS : 0;
+    setSoundEvent(s, "win");
+    return s;
+  }
+
+  if (s.isRunout) {
+    s.message = `${leaving.name} ${reason}. A revelar cartas...`;
+    return s;
+  }
+
+  const canStillAct = s.players.filter(pl => !pl.folded && !pl.allIn);
+  const allMatchedAndActed = canStillAct.every(pl => pl.acted && pl.bet === s.currentBet);
+  const roundDone =
+    canStillAct.length === 0 ||
+    allMatchedAndActed ||
+    (canStillAct.length === 1 && canStillAct[0].bet >= s.currentBet);
+
+  if (roundDone) {
+    refundUncalledBet(s);
+    const canActNext = s.players.filter(pl => !pl.folded && !pl.allIn);
+    if (canActNext.length < 2 && s.phase !== "RIVER") {
+      s.players.forEach(pl => { pl.bet = 0; pl.acted = false; });
+      s.currentBet = 0;
+      s.minRaise = BIG_BLIND;
+      s.turnIndex = -1;
+      s.turnDeadline = 0;
+      s.isRunout = true;
+      s.runoutDeadline = Date.now() + RUNOUT_STEP_MS;
+      s.message = `${leaving.name} ${reason}. ALL-IN! A revelar cartas...`;
+      setSoundEvent(s, "fold");
+      return s;
+    }
+    return advancePhaseOnState(s);
+  }
+
+  if (wasTheirTurn) {
+    const prevPos = (idx - 1 + s.players.length) % s.players.length;
+    const nextIdx = nextActiveIndex(s, prevPos);
+    if (nextIdx === -1) {
+      refundUncalledBet(s);
+      return advancePhaseOnState(s);
+    }
+    s.turnIndex = nextIdx;
+    s.turnDeadline = Date.now() + TURN_DURATION_MS;
+    s.message = `${leaving.name} ${reason}. Vez de ${s.players[s.turnIndex].name}.`;
+    setSoundEvent(s, "fold");
+  } else {
+    s.message = `${leaving.name} ${reason}.`;
+    setSoundEvent(s, "fold");
+  }
+
   return s;
 }
 
