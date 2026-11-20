@@ -1311,51 +1311,105 @@ function setQuickRaise(mode) {
 
 $("btn-create-room").addEventListener("click", async () => {
   SoundEngine.init();
-  if (!isFirebaseConfigured) {
+  showError("");
+  if (!isFirebaseConfigured || !db) {
     showError("Configura primeiro as tuas chaves do Firebase no topo de game.js (ou usa o modo teste).");
     return;
   }
-  myName = $("player-name").value.trim() || "Jogador";
-  localMode = false;
-  currentRoomCode = generateRoomCode();
-  const initial = createInitialRoom(myId, myName);
 
-  roomState = initial;
-  openGameScreen();
-  renderGame();
+  const btn = $("btn-create-room");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "A criar sala...";
 
-  await set(ref(db, `rooms/${currentRoomCode}`), initial);
-  subscribeToRoom(currentRoomCode);
+  try {
+    myName = $("player-name").value.trim() || "Jogador";
+    localMode = false;
+    currentRoomCode = generateRoomCode();
+    const initial = createInitialRoom(myId, myName);
+
+    await set(ref(db, `rooms/${currentRoomCode}`), initial);
+    roomState = initial;
+    openGameScreen();
+    renderGame();
+    subscribeToRoom(currentRoomCode);
+  } catch (err) {
+    console.error("Erro ao criar sala:", err);
+    const msg = String(err?.message || err);
+    if (msg.toLowerCase().includes("permission")) {
+      showError("Firebase bloqueado (PERMISSION_DENIED). Verifica as regras da Realtime Database.");
+    } else {
+      showError(`Erro ao criar sala: ${msg}`);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });
 
 $("btn-join-room").addEventListener("click", async () => {
   SoundEngine.init();
-  if (!isFirebaseConfigured) {
+  showError("");
+  if (!isFirebaseConfigured || !db) {
     showError("Configura primeiro o Firebase no topo de game.js.");
     return;
   }
-  const code = $("room-code").value.trim().toUpperCase();
+
+  const code = $("room-code").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   myName = $("player-name").value.trim() || "Jogador";
   if (!code) return showError("Introduz o código da sala.");
 
-  const snap = await get(ref(db, `rooms/${code}`));
-  if (!snap.exists()) return showError("Sala não encontrada.");
+  const btn = $("btn-join-room");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "A entrar...";
 
-  const data = normalizeRoomState(snap.val());
-  const players = data.players;
-  if (players.length >= MAX_PLAYERS) return showError("A mesa já está cheia (6/6).");
+  try {
+    const snap = await get(ref(db, `rooms/${code}`));
+    if (!snap.exists()) {
+      showError(`Sala "${code}" não encontrada.`);
+      return;
+    }
 
-  localMode = false;
-  currentRoomCode = code;
-  players.push({
-    id: myId, name: myName, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
-    hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false,
-    status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
-  });
+    const data = normalizeRoomState(snap.val());
+    const players = data.players;
+    if (players.length >= MAX_PLAYERS) {
+      showError("A mesa já está cheia (6/6).");
+      return;
+    }
 
-  await update(ref(db, `rooms/${code}`), { players });
-  subscribeToRoom(code);
-  openGameScreen();
+    localMode = false;
+    currentRoomCode = code;
+    players.push({
+      id: myId, name: myName, chips: STARTING_CHIPS, bet: 0, totalBet: 0,
+      hand: [], folded: data.phase !== "WAITING", allIn: false, acted: false, isBot: false,
+      status: data.phase === "WAITING" ? "PRONTO" : "A AGUARDAR MÃO"
+    });
+
+    await update(ref(db, `rooms/${code}`), { players });
+    roomState = { ...data, players };
+    subscribeToRoom(code);
+    openGameScreen();
+    renderGame();
+  } catch (err) {
+    console.error("Erro ao entrar na sala:", err);
+    const msg = String(err?.message || err);
+    if (msg.toLowerCase().includes("permission")) {
+      showError("Firebase bloqueado (PERMISSION_DENIED). Verifica as regras da Realtime Database.");
+    } else {
+      showError(`Erro ao entrar na sala: ${msg}`);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+$("room-code").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    $("btn-join-room").click();
+  }
 });
 
 function subscribeToRoom(code) {
