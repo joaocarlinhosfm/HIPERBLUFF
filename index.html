@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>HIPERBLUFF — Poker Multiplayer</title>
-  <link rel="stylesheet" href="style.css?v=16" />
+  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="menus.css?v=17" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#071321" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -25,7 +26,7 @@
 </head>
 <body>
 
-  <!-- BLOQUEIO DE ECRÃ VERTICAL (OBRIGA MODO HORIZONTAL EM TELEMÓVEL) -->
+  <!-- BLOQUEIO DE ECRÃ VERTICAL -->
   <div id="portrait-lock" class="portrait-lock" aria-live="polite">
     <div class="portrait-lock-card">
       <div class="rotate-phone-icon" aria-hidden="true">📱</div>
@@ -35,31 +36,21 @@
     </div>
   </div>
 
-  <!-- ECRÃ DE LOBBY (SEMPRE HORIZONTAL — TEMA FRIO / GLACIAL) -->
-  <div id="lobby-screen" class="screen active">
+  <!-- 1. ECRÃ INDEPENDENTE DE LOGIN / REGISTO -->
+  <div id="auth-screen" class="screen active">
     <div class="snow-layer" aria-hidden="true">
-      <span class="flake f1">❄</span>
-      <span class="flake f2">•</span>
-      <span class="flake f3">❅</span>
-      <span class="flake f4">•</span>
-      <span class="flake f5">❄</span>
-      <span class="flake f6">•</span>
-      <span class="flake f7">❆</span>
-      <span class="flake f8">•</span>
-      <span class="flake f9">❄</span>
-      <span class="flake f10">•</span>
-      <span class="flake f11">❅</span>
-      <span class="flake f12">•</span>
+      <span class="flake f1">❄</span><span class="flake f2">•</span><span class="flake f3">❅</span>
+      <span class="flake f4">•</span><span class="flake f5">❄</span><span class="flake f6">•</span>
+      <span class="flake f7">❆</span><span class="flake f8">•</span><span class="flake f9">❄</span>
+      <span class="flake f10">•</span><span class="flake f11">❅</span><span class="flake f12">•</span>
     </div>
 
     <div class="lobby-card">
       <div class="frost-top-edge" aria-hidden="true"></div>
-
       <div class="lobby-brand-col">
         <div class="lobby-logo-wrap">
           <img src="icon-512.png" alt="HIPERBLUFF" class="lobby-logo" onerror="this.style.display='none'" />
         </div>
-
         <div class="brand">
           <span class="brand-suit">♠</span>
           <h1>HIPERBLUFF</h1>
@@ -69,71 +60,170 @@
       </div>
 
       <div class="lobby-form-col">
-        <!-- PAINEL DE AUTENTICAÇÃO (LOGIN / REGISTO) -->
-        <div id="auth-panel" class="auth-panel">
-          <div class="auth-tabs">
-            <button id="tab-login" class="auth-tab active" type="button">Entrar</button>
-            <button id="tab-register" class="auth-tab" type="button">Criar Conta</button>
-          </div>
-
-          <div class="form-group">
-            <label for="auth-username">Username</label>
-            <input type="text" id="auth-username" maxlength="14" placeholder="Ex: João" autocomplete="username" />
-          </div>
-
-          <div class="form-group">
-            <label for="auth-pin">Password (4 números)</label>
-            <input
-              type="password"
-              id="auth-pin"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              maxlength="4"
-              placeholder="••••"
-              autocomplete="off"
-            />
-          </div>
-
-          <button id="btn-auth-submit" class="btn btn-primary" type="button">Entrar</button>
-          <p id="auth-hint" class="auth-hint hidden">Novas contas recebem 100 000 € de saldo inicial.</p>
-          <p id="auth-error" class="error-msg"></p>
+        <div class="auth-tabs">
+          <button id="tab-login" class="auth-tab active" type="button">Entrar</button>
+          <button id="tab-register" class="auth-tab" type="button">Criar Conta</button>
         </div>
 
-        <!-- PAINEL DE JOGO (VISÍVEL APÓS LOGIN) -->
-        <div id="play-panel" class="play-panel hidden">
-          <div class="user-profile-bar">
-            <div class="user-profile-info">
-              <span id="profile-username" class="profile-username">Jogador</span>
-              <span id="profile-stats" class="profile-stats">0 mãos • 0 vitórias</span>
-            </div>
-            <div class="user-profile-right">
-              <div id="profile-balance" class="profile-balance">100 000 €</div>
-              <button id="btn-logout" class="btn-tiny btn-logout" type="button" title="Terminar sessão">Sair</button>
-            </div>
-          </div>
-
-          <div class="lobby-actions">
-            <button id="btn-create-room" class="btn btn-primary">Criar Sala Online</button>
-          </div>
-
-          <div class="divider"><span>ou entrar numa sala</span></div>
-
-          <div class="join-row">
-            <input type="text" id="room-code" maxlength="6" placeholder="CÓDIGO" />
-            <button id="btn-join-room" class="btn btn-secondary">Entrar</button>
-          </div>
-
-          <div class="divider"><span>teste rápido offline</span></div>
-
-          <button id="btn-demo-mode" class="btn btn-outline">Jogar Agora (Mesa vs Bots)</button>
-          <button id="btn-install-app" class="btn btn-install hidden">📲 Instalar App no Telemóvel</button>
-          <p id="lobby-error" class="error-msg"></p>
+        <div class="form-group">
+          <label for="auth-username">Username</label>
+          <input type="text" id="auth-username" maxlength="14" placeholder="Ex: João" autocomplete="username" />
         </div>
+
+        <div class="form-group">
+          <label for="auth-pin">Password (4 números)</label>
+          <input type="password" id="auth-pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="off" />
+        </div>
+
+        <button id="btn-auth-submit" class="btn btn-primary" type="button">Entrar</button>
+        <p id="auth-hint" class="auth-hint hidden">Novas contas recebem 100 000 € de saldo inicial.</p>
+        <p id="auth-error" class="error-msg"></p>
       </div>
     </div>
   </div>
 
-  <!-- ECRÃ DA MESA DE JOGO -->
+  <!-- 2. ECRÃ HUB PRINCIPAL (CARDS ESTILO ZYNGA) -->
+  <div id="hub-screen" class="screen">
+    <div class="snow-layer" aria-hidden="true">
+      <span class="flake f1">❄</span><span class="flake f3">❅</span><span class="flake f5">❄</span>
+      <span class="flake f7">❆</span><span class="flake f9">❄</span><span class="flake f11">❅</span>
+    </div>
+
+    <header class="hub-topbar">
+      <button id="hub-profile-trigger" class="hub-user-chip" type="button" title="Abrir Perfil">
+        <div id="hub-avatar-letter" class="avatar-circle">J</div>
+        <div class="hub-user-meta">
+          <span id="hub-username" class="hub-user-name">Jogador</span>
+          <div class="hub-level-row">
+            <span id="hub-level" class="hub-level-tag">LVL 1</span>
+            <div class="xp-bar"><div id="hub-xp-fill" class="xp-fill"></div></div>
+          </div>
+        </div>
+      </button>
+
+      <div class="hub-brand-center"><span>❄</span><span>HIPERBLUFF</span></div>
+
+      <div class="hub-top-right">
+        <div class="hub-balance-pill"><span>🪙</span><span id="hub-balance">100 000 €</span></div>
+        <button id="btn-install-app" class="btn-install-mini hidden" type="button">📲 Instalar</button>
+        <button id="btn-hub-fullscreen" class="btn btn-icon" type="button" title="Ecrã inteiro">⛶</button>
+        <button id="btn-logout" class="btn-tiny btn-logout" type="button">Sair</button>
+      </div>
+    </header>
+
+    <main class="hub-main">
+      <div class="hub-cards-grid">
+        <!-- CARD 1: ONLINE -->
+        <div id="card-play-online" class="mode-card card-online">
+          <div class="card-ribbon">MULTIPLAYER • ATÉ 6 JOGADORES</div>
+          <div class="card-body">
+            <div class="card-fan-art" aria-hidden="true">
+              <div class="mini-art-card">A♠</div>
+              <div class="mini-art-card red">K♥</div>
+            </div>
+            <h2>JOGAR ONLINE</h2>
+            <p>Cria uma sala privada ou entra com código para jogar com amigos.</p>
+          </div>
+          <button id="btn-open-online" class="card-cta" type="button">Escolher Sala</button>
+        </div>
+
+        <!-- CARD 2: BOTS -->
+        <div id="card-play-bots" class="mode-card card-bots">
+          <div class="card-ribbon">PARTIDA INSTANTÂNEA</div>
+          <div class="card-body">
+            <div class="card-emblem" aria-hidden="true">🤖</div>
+            <h2>MESA VS BOTS</h2>
+            <p>Treina estratégias e acumula fichas numa mesa rápida contra 4 bots.</p>
+          </div>
+          <button id="btn-demo-mode" class="card-cta" type="button">Jogar Agora</button>
+        </div>
+
+        <!-- CARD 3: PERFIL -->
+        <div id="card-open-profile" class="mode-card card-profile">
+          <div class="card-ribbon">ESTATÍSTICAS DE CARREIRA</div>
+          <div class="card-body">
+            <div class="card-emblem" aria-hidden="true">🏆</div>
+            <h2>O TEU PERFIL</h2>
+            <p>Vitórias, Folds, All-Ins, Raises, Calls, Checks e maior ganho.</p>
+            <div id="card-profile-summary" class="card-mini-stat">0 vitórias • 0%</div>
+          </div>
+          <button id="btn-open-profile" class="card-cta" type="button">Ver Perfil</button>
+        </div>
+      </div>
+      <p id="hub-error" class="error-msg"></p>
+    </main>
+  </div>
+
+  <!-- 3. ECRÃ INDEPENDENTE DE PERFIL E ESTATÍSTICAS -->
+  <div id="profile-screen" class="screen">
+    <header class="hub-topbar">
+      <button id="btn-profile-back" class="btn btn-outline btn-sm" type="button">← Voltar</button>
+      <div class="hub-brand-center"><span>🏆</span><span>PERFIL</span></div>
+      <div class="hub-top-right">
+        <div class="hub-balance-pill"><span>🪙</span><span id="prof-top-balance">100 000 €</span></div>
+      </div>
+    </header>
+
+    <main class="profile-main">
+      <section class="profile-summary-card">
+        <div id="prof-avatar-letter" class="avatar-circle large">J</div>
+        <div id="prof-username" class="profile-big-name">Jogador</div>
+        <div class="hub-level-row">
+          <span id="prof-level" class="hub-level-tag">LVL 1</span>
+          <div class="xp-bar"><div id="prof-xp-fill" class="xp-fill"></div></div>
+        </div>
+        <div id="prof-balance" class="profile-balance-big">100 000 €</div>
+        <div id="prof-profit" class="profile-profit-pill">Saldo inicial: 0 €</div>
+      </section>
+
+      <section class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-icon">🏆</span>
+          <span id="stat-wins" class="stat-value">0</span>
+          <span class="stat-label">Mãos Ganhas</span>
+          <span id="stat-winrate" class="stat-sub">0% vitórias</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🃏</span>
+          <span id="stat-played" class="stat-value">0</span>
+          <span class="stat-label">Mãos Jogadas</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🏳️</span>
+          <span id="stat-folds" class="stat-value">0</span>
+          <span class="stat-label">Folds</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🔥</span>
+          <span id="stat-allins" class="stat-value">0</span>
+          <span class="stat-label">All-Ins</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">⬆️</span>
+          <span id="stat-raises" class="stat-value">0</span>
+          <span class="stat-label">Raises</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🪙</span>
+          <span id="stat-calls" class="stat-value">0</span>
+          <span class="stat-label">Calls</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">✋</span>
+          <span id="stat-checks" class="stat-value">0</span>
+          <span class="stat-label">Checks</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">💎</span>
+          <span id="stat-biggest-win" class="stat-value">0 €</span>
+          <span class="stat-label">Maior Ganho</span>
+          <span id="stat-best-streak" class="stat-sub">Série: 0</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 4. ECRÃ DA MESA DE JOGO -->
   <div id="game-screen" class="screen">
     <header class="top-bar">
       <div class="top-left">
@@ -152,7 +242,6 @@
 
     <main class="table-area">
       <div class="poker-table">
-        <!-- MESA 3D INCLINADA COM REBORDO EXTRUDADO E FITA LED -->
         <div class="table-3d-stage" aria-hidden="true">
           <div class="table-3d-body">
             <div class="table-led-strip"></div>
@@ -161,32 +250,15 @@
           </div>
         </div>
 
-        <!-- DEALER FIXA NO TOPO DA MESA -->
         <div class="dealer-seat">
           <div class="dealer-avatar-wrap">
             <svg viewBox="0 0 120 120" class="dealer-svg" aria-label="Dealer">
               <defs>
-                <radialGradient id="dealerBg" cx="50%" cy="35%" r="65%">
-                  <stop offset="0%" stop-color="#1e3a5f"/>
-                  <stop offset="100%" stop-color="#071321"/>
-                </radialGradient>
-                <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#fcd34d"/>
-                  <stop offset="45%" stop-color="#d97706"/>
-                  <stop offset="100%" stop-color="#78350f"/>
-                </linearGradient>
-                <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#ffedd5"/>
-                  <stop offset="100%" stop-color="#fed7aa"/>
-                </linearGradient>
-                <linearGradient id="vestGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#4338ca"/>
-                  <stop offset="100%" stop-color="#1e1b4b"/>
-                </linearGradient>
-                <linearGradient id="goldTie" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#fef08a"/>
-                  <stop offset="100%" stop-color="#d97706"/>
-                </linearGradient>
+                <radialGradient id="dealerBg" cx="50%" cy="35%" r="65%"><stop offset="0%" stop-color="#1e3a5f"/><stop offset="100%" stop-color="#071321"/></radialGradient>
+                <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fcd34d"/><stop offset="45%" stop-color="#d97706"/><stop offset="100%" stop-color="#78350f"/></linearGradient>
+                <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ffedd5"/><stop offset="100%" stop-color="#fed7aa"/></linearGradient>
+                <linearGradient id="vestGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#4338ca"/><stop offset="100%" stop-color="#1e1b4b"/></linearGradient>
+                <linearGradient id="goldTie" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#d97706"/></linearGradient>
               </defs>
               <circle cx="60" cy="60" r="59" fill="url(#dealerBg)"/>
               <circle cx="60" cy="48" r="34" fill="rgba(56,189,248,0.14)"/>
@@ -196,21 +268,16 @@
               <path d="M35 81 L60 104 L85 81 L92 118 L28 118 Z" fill="url(#vestGrad)"/>
               <path d="M35 81 L60 104 L55 110 L32 88 Z" fill="#312e81"/>
               <path d="M85 81 L60 104 L65 110 L88 88 Z" fill="#312e81"/>
-              <circle cx="60" cy="109" r="2.2" fill="#f5b942"/>
-              <circle cx="60" cy="116" r="2.2" fill="#f5b942"/>
+              <circle cx="60" cy="109" r="2.2" fill="#f5b942"/><circle cx="60" cy="116" r="2.2" fill="#f5b942"/>
               <rect x="70" y="96" width="11" height="4.5" rx="1.5" fill="#f5b942"/>
               <rect x="52" y="66" width="16" height="16" rx="6" fill="url(#skinGrad)"/>
               <path d="M52 70 Q60 76 68 70 L68 75 Q60 80 52 75 Z" fill="rgba(180,83,9,0.2)"/>
-              <polygon points="49,80 60,85 49,90" fill="url(#goldTie)"/>
-              <polygon points="71,80 60,85 71,90" fill="url(#goldTie)"/>
+              <polygon points="49,80 60,85 49,90" fill="url(#goldTie)"/><polygon points="71,80 60,85 71,90" fill="url(#goldTie)"/>
               <circle cx="60" cy="85" r="3" fill="#fde047" stroke="#92400e" stroke-width="0.8"/>
               <ellipse cx="60" cy="50" rx="19" ry="22" fill="url(#skinGrad)"/>
-              <ellipse cx="48" cy="55" rx="4" ry="2.2" fill="rgba(244,63,94,0.18)"/>
-              <ellipse cx="72" cy="55" rx="4" ry="2.2" fill="rgba(244,63,94,0.18)"/>
-              <ellipse cx="52" cy="49" rx="2.7" ry="2.9" fill="#0f172a"/>
-              <ellipse cx="68" cy="49" rx="2.7" ry="2.9" fill="#0f172a"/>
-              <circle cx="51.2" cy="48" r="1" fill="#ffffff"/>
-              <circle cx="67.2" cy="48" r="1" fill="#ffffff"/>
+              <ellipse cx="48" cy="55" rx="4" ry="2.2" fill="rgba(244,63,94,0.18)"/><ellipse cx="72" cy="55" rx="4" ry="2.2" fill="rgba(244,63,94,0.18)"/>
+              <ellipse cx="52" cy="49" rx="2.7" ry="2.9" fill="#0f172a"/><ellipse cx="68" cy="49" rx="2.7" ry="2.9" fill="#0f172a"/>
+              <circle cx="51.2" cy="48" r="1" fill="#ffffff"/><circle cx="67.2" cy="48" r="1" fill="#ffffff"/>
               <path d="M47 44 Q52 41.5 56 44" fill="none" stroke="#92400e" stroke-width="1.6" stroke-linecap="round"/>
               <path d="M64 44 Q68 41.5 73 44" fill="none" stroke="#92400e" stroke-width="1.6" stroke-linecap="round"/>
               <path d="M59.5 52 Q60 55 61.5 55" fill="none" stroke="rgba(180,83,9,0.45)" stroke-width="1.3" stroke-linecap="round"/>
@@ -230,21 +297,16 @@
           </div>
         </div>
 
-        <!-- CENTRO DO FELTRO -->
         <div class="table-center">
           <div class="pot-zone">
             <div id="pot-chips" class="pot-chips"></div>
-            <div class="pot-display">
-              <span class="pot-label">POTE</span>
-              <span id="pot-amount">0</span> €
-            </div>
+            <div class="pot-display"><span class="pot-label">POTE</span><span id="pot-amount">0</span> €</div>
           </div>
           <div id="side-pots-display" class="side-pots-display hidden"></div>
           <div id="community-cards" class="community-cards"></div>
           <div id="winning-hand-banner" class="winning-hand-banner hidden"></div>
         </div>
 
-        <!-- 6 LUGARES -->
         <div id="seats-container" class="seats-container">
           <div class="seat seat-0" data-seat="0"></div>
           <div class="seat seat-1" data-seat="1"></div>
@@ -256,7 +318,6 @@
       </div>
     </main>
 
-    <!-- HUD FLUTUANTE INFERIOR -->
     <footer class="controls-hud">
       <div class="hud-bottom-left">
         <div class="table-quick-actions">
@@ -276,7 +337,6 @@
           </div>
           <input type="range" id="raise-slider" min="20" max="1000" step="10" value="40" />
         </div>
-
         <div class="main-action-row">
           <button id="btn-fold" class="btn btn-fold">Fold</button>
           <button id="btn-check-call" class="btn btn-call">Check</button>
@@ -287,12 +347,38 @@
     </footer>
   </div>
 
+  <!-- MODAL SALA ONLINE (CRIAR / ENTRAR COM CÓDIGO) -->
+  <div id="online-modal" class="modal-backdrop hidden">
+    <div class="modal-box online-modal-box">
+      <div class="modal-head">
+        <h3>♠ Jogar Online</h3>
+        <button id="btn-close-online-modal" class="btn-tiny" type="button">✕ Fechar</button>
+      </div>
+      <div class="online-options-grid">
+        <div class="online-box-col">
+          <h4>Criar Nova Sala</h4>
+          <p>Gera um código de 5 letras para partilhares com os teus amigos.</p>
+          <button id="btn-create-room" class="btn btn-primary" type="button">Criar Sala Online</button>
+        </div>
+        <div class="online-box-col">
+          <h4>Entrar numa Sala</h4>
+          <p>Introduz o código da mesa do anfitrião para te sentares.</p>
+          <div class="join-row">
+            <input type="text" id="room-code" maxlength="6" placeholder="CÓDIGO" />
+            <button id="btn-join-room" class="btn btn-secondary" type="button">Entrar</button>
+          </div>
+        </div>
+      </div>
+      <p id="lobby-error" class="error-msg"></p>
+    </div>
+  </div>
+
   <!-- MODAL DE INSTALAÇÃO PARA IPHONE (SAFARI) -->
   <div id="ios-install-modal" class="modal-backdrop hidden">
     <div class="modal-box">
       <h3>❄ Instalar HIPERBLUFF no iPhone</h3>
       <ol class="ios-steps">
-        <li>Toca no botão <strong>Partilhar</strong> (ícone de quadrado com seta para cima) na barra do Safari.</li>
+        <li>Toca no botão <strong>Partilhar</strong> na barra do Safari.</li>
         <li>Desce e toca em <strong>Adicionar ao ecrã principal</strong>.</li>
         <li>Toca em <strong>Adicionar</strong> no canto superior direito.</li>
       </ol>
