@@ -221,6 +221,7 @@ const NEXT_HAND_DELAY_MS = 6000;
 const AUTO_START_DELAY_MS = 10000;
 const RUNOUT_STEP_MS = 1300;
 
+/* Temas da fita LED da mesa (a cor é guardada na sala, por isso todos os jogadores veem a mesma) */
 const LED_THEMES = [
   { name: "Gelo",       core: "#38bdf8", bright: "#bae6fd", soft: "rgba(56, 189, 248, 0.45)" },
   { name: "Ouro Vegas", core: "#f59e0b", bright: "#fef08a", soft: "rgba(245, 158, 11, 0.46)" },
@@ -231,7 +232,14 @@ const LED_THEMES = [
   { name: "Âmbar",      core: "#f97316", bright: "#fed7aa", soft: "rgba(249, 115, 22, 0.46)" }
 ];
 
-let lastLedIndex = Number(sessionStorage.getItem("hiperbluff_led") ?? -1);
+let lastLedIndex = (() => {
+  try {
+    const saved = Number(sessionStorage.getItem("hiperbluff_led") ?? -1);
+    return Number.isFinite(saved) ? saved : -1;
+  } catch (_) {
+    return -1;
+  }
+})();
 
 function pickNextLedIndex() {
   let idx;
@@ -253,6 +261,7 @@ function applyTableLedTheme(index) {
   lastLedIndex = safeIdx;
   try { sessionStorage.setItem("hiperbluff_led", String(safeIdx)); } catch (_) {}
 }
+
 const $ = (id) => document.getElementById(id);
 const on = (id, event, handler) => {
   const el = $(id);
@@ -440,8 +449,8 @@ function normalizeRoomState(raw) {
     : Object.values(raw.players || {});
 
   return {
-    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
     hostId: raw.hostId || "",
+    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
     phase: raw.phase || "WAITING",
     pot: Number(raw.pot) || 0,
     currentBet: Number(raw.currentBet) || 0,
@@ -541,7 +550,6 @@ function createInitialRoom(hostId, hostName) {
   return {
     hostId,
     tableLedIndex: pickNextLedIndex(),
-    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
     phase: "WAITING",
     pot: 0,
     currentBet: 0,
@@ -1226,7 +1234,8 @@ function renderCardHTML(card, hidden = false, small = false, highlightClass = ""
 
 function renderGame() {
   if (!roomState) return;
-   applyTableLedTheme(roomState.tableLedIndex);
+
+  applyTableLedTheme(roomState.tableLedIndex);
 
   if (roomState.lastEvent && roomState.lastEvent.ts !== lastPlayedEventTs) {
     lastPlayedEventTs = roomState.lastEvent.ts;
