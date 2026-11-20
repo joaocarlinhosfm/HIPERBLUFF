@@ -32,6 +32,76 @@ export const LED_THEMES = [
   { name: "Âmbar",      core: "#f97316", bright: "#fed7aa", soft: "rgba(249, 115, 22, 0.46)" }
 ];
 
+export const PERMANENT_ROOMS = [
+  {
+    id: "MESA_1",
+    name: "Mesa Gelo",
+    tier: "MESA 1 • INICIANTE",
+    buyIn: 5000,
+    minEntry: 100,
+    smallBlind: 50,
+    bigBlind: 100,
+    ledIndex: 0
+  },
+  {
+    id: "MESA_2",
+    name: "Mesa Ouro",
+    tier: "MESA 2 • INTERMÉDIO",
+    buyIn: 10000,
+    minEntry: 10000,
+    smallBlind: 100,
+    bigBlind: 200,
+    ledIndex: 1
+  },
+  {
+    id: "MESA_3",
+    name: "Mesa VIP",
+    tier: "MESA 3 • HIGH ROLLER",
+    buyIn: 50000,
+    minEntry: 50000,
+    smallBlind: 500,
+    bigBlind: 1000,
+    ledIndex: 2
+  }
+];
+
+export function getPermanentRoomConfig(roomId) {
+  return PERMANENT_ROOMS.find(r => r.id === roomId) || null;
+}
+
+export function createPermanentRoomState(config) {
+  return {
+    roomId: config.id,
+    roomName: config.name,
+    permanent: true,
+    buyIn: config.buyIn,
+    smallBlind: config.smallBlind,
+    bigBlind: config.bigBlind,
+    hostId: "",
+    tableLedIndex: config.ledIndex,
+    handId: 0,
+    phase: "WAITING",
+    pot: 0,
+    deadPot: 0,
+    currentBet: 0,
+    minRaise: config.bigBlind,
+    dealerIndex: 0,
+    turnIndex: -1,
+    turnDeadline: 0,
+    nextHandDeadline: 0,
+    isRunout: false,
+    runoutDeadline: 0,
+    lastEvent: null,
+    winnerIds: [],
+    winningHandName: "",
+    winningCards: [],
+    deck: [],
+    community: [],
+    message: "Mesa livre — A aguardar jogadores...",
+    players: []
+  };
+}
+
 export function cardKey(card) {
   return card ? `${card.rank}_${card.suit}` : "";
 }
@@ -45,13 +115,6 @@ export function secureRandomInt(max) {
     rand = buf[0];
   } while (rand >= limit);
   return rand % max;
-}
-
-export function generateRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 5; i++) code += chars[secureRandomInt(chars.length)];
-  return code;
 }
 
 function createDeck() {
@@ -197,15 +260,26 @@ export function normalizeRoomState(raw) {
     ? raw.players
     : Object.values(raw.players || {});
 
+  const permCfg = getPermanentRoomConfig(raw.roomId);
+  const buyIn = Number(raw.buyIn) || permCfg?.buyIn || STARTING_CHIPS;
+  const smallBlind = Number(raw.smallBlind) || permCfg?.smallBlind || SMALL_BLIND;
+  const bigBlind = Number(raw.bigBlind) || permCfg?.bigBlind || BIG_BLIND;
+
   return {
+    roomId: raw.roomId || permCfg?.id || "",
+    roomName: raw.roomName || permCfg?.name || "",
+    permanent: Boolean(raw.permanent || permCfg),
+    buyIn,
+    smallBlind,
+    bigBlind,
     hostId: raw.hostId || "",
-    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : 0,
+    tableLedIndex: raw.tableLedIndex !== undefined ? Number(raw.tableLedIndex) : (permCfg?.ledIndex ?? 0),
     handId: Number(raw.handId) || 0,
     phase: raw.phase || "WAITING",
     pot: Number(raw.pot) || 0,
     deadPot: Number(raw.deadPot) || 0,
     currentBet: Number(raw.currentBet) || 0,
-    minRaise: Number(raw.minRaise) || BIG_BLIND,
+    minRaise: Number(raw.minRaise) || bigBlind,
     dealerIndex: Number(raw.dealerIndex) || 0,
     turnIndex: raw.turnIndex !== undefined ? Number(raw.turnIndex) : -1,
     turnDeadline: Number(raw.turnDeadline) || 0,
@@ -237,8 +311,17 @@ export function normalizeRoomState(raw) {
   };
 }
 
-export function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIPS, ledIndex = 0) {
+export function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIPS, ledIndex = 0, stakes = {}) {
+  const buyIn = Number(stakes.buyIn) || STARTING_CHIPS;
+  const smallBlind = Number(stakes.smallBlind) || SMALL_BLIND;
+  const bigBlind = Number(stakes.bigBlind) || BIG_BLIND;
   return {
+    roomId: stakes.roomId || "OFFLINE",
+    roomName: stakes.roomName || "Mesa vs Bots",
+    permanent: Boolean(stakes.permanent),
+    buyIn,
+    smallBlind,
+    bigBlind,
     hostId,
     tableLedIndex: ledIndex,
     handId: 0,
@@ -246,7 +329,7 @@ export function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIP
     pot: 0,
     deadPot: 0,
     currentBet: 0,
-    minRaise: BIG_BLIND,
+    minRaise: bigBlind,
     dealerIndex: 0,
     turnIndex: -1,
     turnDeadline: 0,
@@ -259,7 +342,7 @@ export function createInitialRoom(hostId, hostName, initialChips = STARTING_CHIP
     winningCards: [],
     deck: [],
     community: [],
-    message: "A aguardar jogadores... Partilha o código da sala!",
+    message: "A preparar mesa...",
     players: [
       {
         id: hostId, name: hostName, chips: initialChips, handStartChips: initialChips,
@@ -310,9 +393,12 @@ function refundUncalledBet(s) {
 
 export function buildNewHandState(roomState) {
   const s = normalizeRoomState(structuredClone(roomState));
+  const sb = Number(s.smallBlind) || SMALL_BLIND;
+  const bb = Number(s.bigBlind) || BIG_BLIND;
+
   const eligible = s.players.filter(p => p.chips > 0);
   if (eligible.length < 2) {
-    s.message = "Fim do torneio! Faz Rebuy ou inicia Nova Partida.";
+    s.message = "Fim do torneio! Faz Rebuy ou aguarda outro jogador.";
     s.nextHandDeadline = 0;
     s.turnDeadline = 0;
     s.isRunout = false;
@@ -359,11 +445,11 @@ export function buildNewHandState(roomState) {
   const sbPos = activeIndices.length === 2 ? s.dealerIndex : nextActiveIndex(s, s.dealerIndex);
   const bbPos = nextActiveIndex(s, sbPos);
 
-  postBlind(s, sbPos, SMALL_BLIND, "SB");
-  postBlind(s, bbPos, BIG_BLIND, "BB");
+  postBlind(s, sbPos, sb, "SB");
+  postBlind(s, bbPos, bb, "BB");
 
   s.currentBet = Math.max(s.players[sbPos].bet, s.players[bbPos].bet);
-  s.minRaise = BIG_BLIND;
+  s.minRaise = bb;
 
   const canActAfterBlinds = s.players.filter(p => !p.folded && !p.allIn);
   const firstToAct = nextActiveIndex(s, bbPos);
@@ -442,12 +528,13 @@ function resolveShowdownOnState(s) {
     });
 
     const names = potWinners.map(w => w.name).join(" & ");
+    const amtText = pot.amount.toLocaleString("pt-PT");
     if (potIndex === 0) {
       mainWinningHandName = potWinners[0].status;
       mainWinningCardSet = cardSet;
-      potSummaries.push(`${names} +${pot.amount}€ (${potWinners[0].status})`);
+      potSummaries.push(`${names} +${amtText}€ (${potWinners[0].status})`);
     } else {
-      potSummaries.push(`Side Pot: ${names} +${pot.amount}€`);
+      potSummaries.push(`Side Pot: ${names} +${amtText}€`);
     }
   });
 
@@ -464,13 +551,15 @@ function resolveShowdownOnState(s) {
 
 export function advancePhaseOnState(rawState) {
   const s = normalizeRoomState(structuredClone(rawState));
+  const bb = Number(s.bigBlind) || BIG_BLIND;
+
   s.players.forEach(p => {
     p.bet = 0;
     p.acted = false;
     if (!p.folded && !p.allIn) p.status = "";
   });
   s.currentBet = 0;
-  s.minRaise = BIG_BLIND;
+  s.minRaise = bb;
 
   if (s.phase === "PREFLOP") {
     s.deck.pop();
@@ -513,6 +602,7 @@ export function advancePhaseOnState(rawState) {
 export function applyActionToState(roomState, playerId, action, raiseTo = 0, isTimeout = false) {
   if (!roomState || roomState.isRunout) return null;
   const s = normalizeRoomState(structuredClone(roomState));
+  const bb = Number(s.bigBlind) || BIG_BLIND;
   const idx = s.turnIndex;
   if (idx < 0 || !s.players[idx] || s.players[idx].id !== playerId) return null;
 
@@ -535,7 +625,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
       p.status = "ALL-IN";
       soundType = "allin";
     } else {
-      p.status = toCall === 0 ? (isTimeout ? "AUTO-CHECK" : "CHECK") : `CALL ${toCall}€`;
+      p.status = toCall === 0 ? (isTimeout ? "AUTO-CHECK" : "CHECK") : `CALL ${toCall.toLocaleString("pt-PT")}€`;
       soundType = toCall === 0 ? "check" : "chip";
     }
   } else if (action === "raise") {
@@ -543,7 +633,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
     const needed = Math.max(0, Math.min(p.chips, target - p.bet));
     const newBet = p.bet + needed;
     if (newBet > s.currentBet) {
-      s.minRaise = Math.max(BIG_BLIND, newBet - s.currentBet);
+      s.minRaise = Math.max(bb, newBet - s.currentBet);
       s.currentBet = newBet;
       s.players.forEach(other => { if (other.id !== p.id) other.acted = false; });
     }
@@ -551,7 +641,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
     p.bet = newBet;
     p.totalBet += needed;
     s.pot += needed;
-    p.status = p.chips === 0 ? "ALL-IN" : `RAISE ${newBet}€`;
+    p.status = p.chips === 0 ? "ALL-IN" : `RAISE ${newBet.toLocaleString("pt-PT")}€`;
     soundType = p.chips === 0 ? "allin" : "chip";
     if (p.chips === 0) p.allIn = true;
   } else if (action === "allin") {
@@ -564,7 +654,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
     p.status = "ALL-IN";
     soundType = "allin";
     if (p.bet > s.currentBet) {
-      s.minRaise = Math.max(BIG_BLIND, p.bet - s.currentBet);
+      s.minRaise = Math.max(bb, p.bet - s.currentBet);
       s.currentBet = p.bet;
       s.players.forEach(other => { if (other.id !== p.id) other.acted = false; });
     }
@@ -578,7 +668,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
     s.winnerIds = [remaining[0].id];
     s.winningHandName = `${remaining[0].name} VENCEU`;
     s.winningCards = [];
-    s.message = `${remaining[0].name} recolhe ${s.pot}€!`;
+    s.message = `${remaining[0].name} recolhe ${s.pot.toLocaleString("pt-PT")}€!`;
     s.phase = "SHOWDOWN";
     s.turnIndex = -1;
     s.turnDeadline = 0;
@@ -604,7 +694,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
     if (canActNext.length < 2 && s.phase !== "RIVER") {
       s.players.forEach(pl => { pl.bet = 0; pl.acted = false; });
       s.currentBet = 0;
-      s.minRaise = BIG_BLIND;
+      s.minRaise = bb;
       s.turnIndex = -1;
       s.turnDeadline = 0;
       s.isRunout = true;
@@ -633,6 +723,7 @@ export function applyActionToState(roomState, playerId, action, raiseTo = 0, isT
 export function removePlayerFromState(roomState, playerId, reason = "saiu da mesa", preferredHostId = "") {
   if (!roomState) return null;
   const s = normalizeRoomState(structuredClone(roomState));
+  const bb = Number(s.bigBlind) || BIG_BLIND;
   const idx = s.players.findIndex(p => p.id === playerId);
   if (idx === -1) return null;
 
@@ -648,11 +739,23 @@ export function removePlayerFromState(roomState, playerId, reason = "saiu da mes
 
   if (s.players.length === 0) {
     s.hostId = "";
+    s.phase = "WAITING";
+    s.pot = 0;
+    s.deadPot = 0;
+    s.currentBet = 0;
+    s.minRaise = bb;
+    s.dealerIndex = 0;
     s.turnIndex = -1;
     s.turnDeadline = 0;
     s.nextHandDeadline = 0;
     s.isRunout = false;
     s.runoutDeadline = 0;
+    s.winnerIds = [];
+    s.winningHandName = "";
+    s.winningCards = [];
+    s.deck = [];
+    s.community = [];
+    s.message = "Mesa livre — A aguardar jogadores...";
     return s;
   }
 
@@ -677,6 +780,8 @@ export function removePlayerFromState(roomState, playerId, reason = "saiu da mes
 
   if (s.phase === "WAITING") {
     if (s.players.length < 2) {
+      s.pot = 0;
+      s.deadPot = 0;
       s.nextHandDeadline = 0;
       s.message = `${leaving.name} ${reason}. A aguardar jogadores...`;
     } else {
@@ -715,7 +820,7 @@ export function removePlayerFromState(roomState, playerId, reason = "saiu da mes
     s.winnerIds = [remaining[0].id];
     s.winningHandName = `${remaining[0].name} VENCEU`;
     s.winningCards = [];
-    s.message = `${leaving.name} ${reason}. ${remaining[0].name} recolhe ${s.pot}€!`;
+    s.message = `${leaving.name} ${reason}. ${remaining[0].name} recolhe ${s.pot.toLocaleString("pt-PT")}€!`;
     s.phase = "SHOWDOWN";
     s.turnIndex = -1;
     s.turnDeadline = 0;
@@ -745,7 +850,7 @@ export function removePlayerFromState(roomState, playerId, reason = "saiu da mes
     if (canActNext.length < 2 && s.phase !== "RIVER") {
       s.players.forEach(pl => { pl.bet = 0; pl.acted = false; });
       s.currentBet = 0;
-      s.minRaise = BIG_BLIND;
+      s.minRaise = bb;
       s.turnIndex = -1;
       s.turnDeadline = 0;
       s.isRunout = true;
