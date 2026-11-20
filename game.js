@@ -21,6 +21,7 @@ if (isFirebaseConfigured) {
   } catch (err) {
     console.error("Erro ao inicializar Firebase:", err);
   }
+}
 
 /* ============================================================================
    2. MOTOR DE ÁUDIO SINTÉTICO (WEB AUDIO API — ZERO MP3 EXTERNOS)
