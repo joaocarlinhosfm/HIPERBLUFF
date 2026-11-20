@@ -1,4 +1,4 @@
-import { ref, get, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { ref, get, set, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 export const INITIAL_BALANCE = 100000;
 const SESSION_KEY = "hiperbluff_session_v1";
@@ -30,7 +30,6 @@ async function hashPin(userKey, pin) {
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
   }
-  // Fallback simples caso abra fora de HTTPS/localhost
   let h = 2166136261;
   for (let i = 0; i < raw.length; i++) {
     h ^= raw.charCodeAt(i);
@@ -58,9 +57,17 @@ function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Sem resposta do Firebase. Verifica a ligação ou as regras da base de dados.")), ms)
+      setTimeout(() => reject(new Error("Sem resposta do Firebase. Verifica a ligação à internet.")), ms)
     )
   ]);
+}
+
+function formatFirebaseError(err) {
+  const msg = String(err?.message || err || "");
+  if (msg.toLowerCase().includes("permission")) {
+    return new Error("Permissão negada no Firebase (users). Publica as regras do nó 'users' na Realtime Database.");
+  }
+  return err instanceof Error ? err : new Error(msg || "Erro desconhecido no Firebase.");
 }
 
 function notifyChange() {
@@ -89,10 +96,7 @@ function subscribeUser(key) {
   if (!dbRef || !key) return;
 
   unsubscribeUser = onValue(ref(dbRef, `users/${key}`), (snap) => {
-    if (!snap.exists()) {
-      logoutUser();
-      return;
-    }
+    if (!snap.exists()) return;
     const data = snap.val();
     currentUser = {
       key,
@@ -141,8 +145,8 @@ export async function restoreSession() {
         handsPlayed: Number(data.handsPlayed) || 0,
         handsWon: Number(data.handsWon) || 0
       };
-      subscribeUser(saved.key);
       notifyChange();
+      subscribeUser(saved.key);
       return currentUser;
     }
   } catch (err) {
@@ -159,39 +163,40 @@ export async function registerUser(username, pin) {
   if (!dbRef) throw new Error("Firebase não configurado.");
   const { displayName, key } = validateCredentials(username, pin);
   const pinHash = await hashPin(key, pin);
-
   const userRef = ref(dbRef, `users/${key}`);
-  const result = await withTimeout(
-    runTransaction(userRef, (existing) => {
-      if (existing !== null) return; // Aborta se o username já existir
-      return {
-        username: displayName,
-        pinHash,
-        balance: INITIAL_BALANCE,
-        handsPlayed: 0,
-        handsWon: 0,
-        createdAt: Date.now()
-      };
-    })
-  );
 
-  if (!result.committed) {
-    throw new Error("Esse username já existe. Escolhe outro ou faz Login.");
+  try {
+    const existingSnap = await withTimeout(get(userRef));
+    if (existingSnap.exists()) {
+      throw new Error("Esse username já existe. Escolhe outro ou faz Login.");
+    }
+
+    const newUserRecord = {
+      username: displayName,
+      pinHash,
+      balance: INITIAL_BALANCE,
+      handsPlayed: 0,
+      handsWon: 0,
+      createdAt: Date.now()
+    };
+
+    await withTimeout(set(userRef, newUserRecord));
+
+    currentUser = {
+      key,
+      username: displayName,
+      balance: INITIAL_BALANCE,
+      handsPlayed: 0,
+      handsWon: 0
+    };
+
+    saveSession(key, pinHash);
+    notifyChange();
+    subscribeUser(key);
+    return currentUser;
+  } catch (err) {
+    throw formatFirebaseError(err);
   }
-
-  const data = result.snapshot.val();
-  currentUser = {
-    key,
-    username: data.username,
-    balance: Number(data.balance) || INITIAL_BALANCE,
-    handsPlayed: 0,
-    handsWon: 0
-  };
-
-  saveSession(key, pinHash);
-  subscribeUser(key);
-  notifyChange();
-  return currentUser;
 }
 
 export async function loginUser(username, pin) {
@@ -199,28 +204,32 @@ export async function loginUser(username, pin) {
   const { key } = validateCredentials(username, pin);
   const pinHash = await hashPin(key, pin);
 
-  const snap = await withTimeout(get(ref(dbRef, `users/${key}`)));
-  if (!snap.exists()) {
-    throw new Error("Utilizador não encontrado. Cria conta primeiro.");
+  try {
+    const snap = await withTimeout(get(ref(dbRef, `users/${key}`)));
+    if (!snap.exists()) {
+      throw new Error("Utilizador não encontrado. Toca em 'Criar Conta' acima.");
+    }
+
+    const data = snap.val();
+    if (data.pinHash !== pinHash) {
+      throw new Error("Password de 4 números incorreta.");
+    }
+
+    currentUser = {
+      key,
+      username: data.username || key,
+      balance: Math.max(0, Number(data.balance) || 0),
+      handsPlayed: Number(data.handsPlayed) || 0,
+      handsWon: Number(data.handsWon) || 0
+    };
+
+    saveSession(key, pinHash);
+    notifyChange();
+    subscribeUser(key);
+    return currentUser;
+  } catch (err) {
+    throw formatFirebaseError(err);
   }
-
-  const data = snap.val();
-  if (data.pinHash !== pinHash) {
-    throw new Error("Password de 4 números incorreta.");
-  }
-
-  currentUser = {
-    key,
-    username: data.username || key,
-    balance: Math.max(0, Number(data.balance) || 0),
-    handsPlayed: Number(data.handsPlayed) || 0,
-    handsWon: Number(data.handsWon) || 0
-  };
-
-  saveSession(key, pinHash);
-  subscribeUser(key);
-  notifyChange();
-  return currentUser;
 }
 
 export function logoutUser() {
@@ -233,10 +242,6 @@ export function logoutUser() {
   notifyChange();
 }
 
-/**
- * Atualiza o saldo do utilizador de forma atómica no Firebase após cada mão.
- * delta pode ser positivo (lucro) ou negativo (perda).
- */
 export async function applyBalanceDelta(delta, { won = false, countHand = true } = {}) {
   if (!dbRef || !currentUser || !currentUser.key) return;
   const safeDelta = Math.round(Number(delta) || 0);
@@ -255,6 +260,19 @@ export async function applyBalanceDelta(delta, { won = false, countHand = true }
       return data;
     });
   } catch (err) {
-    console.error("Erro ao atualizar saldo do utilizador:", err);
+    console.warn("Fallback de atualização de saldo:", err);
+    try {
+      const snap = await get(userRef);
+      if (!snap.exists()) return;
+      const d = snap.val();
+      const nextBalance = Math.max(0, (Number(d.balance) || 0) + safeDelta);
+      const nextPlayed = countHand ? (Number(d.handsPlayed) || 0) + 1 : (Number(d.handsPlayed) || 0);
+      const nextWon = countHand && won ? (Number(d.handsWon) || 0) + 1 : (Number(d.handsWon) || 0);
+      await update(userRef, { balance: nextBalance, handsPlayed: nextPlayed, handsWon: nextWon });
+    } catch (err2) {
+      console.error("Erro ao atualizar saldo do utilizador:", err2);
+    }
   }
 }
+
+/* === FIM DO FICHEIRO user.js === */
