@@ -1023,5 +1023,63 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   .seat.is-me.has-cards .seat-chips { margin-top: 19px; }
   .main-action-row .btn { min-height: 30px; padding: 0.28rem 0.48rem; font-size: 0.7rem; }
 }
+  
+  /* ================= AVATARES NOS LUGARES DA MESA ================= */
+.seat-circle.has-avatar {
+  position: relative;
+  padding: 0;
+}
+
+.seat-avatar-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.seat-avatar-bg .avatar-svg-wrap,
+.seat-avatar-bg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.seat-circle.has-avatar .seat-name {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  margin-bottom: 5px;
+  background: rgba(5, 13, 24, 0.84);
+  border: 1px solid rgba(186, 230, 253, 0.28);
+  padding: 1px 7px;
+  border-radius: 999px;
+  max-width: 92%;
+  font-size: 0.68rem;
+}
+
+.seat-circle.has-avatar .seat-you-tag {
+  display: none;
+}
+
+.seat.is-me.has-cards .seat-circle.has-avatar {
+  padding-top: 3px;
+}
+
+.seat.is-me.has-cards .seat-circle.has-avatar .seat-name {
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+
+@media (max-height: 540px) {
+  .seat-circle.has-avatar .seat-name {
+    margin-bottom: 3px;
+    padding: 0 5px;
+    font-size: 0.54rem;
+  }
+  .seat.is-me.has-cards .seat-circle.has-avatar .seat-name {
+    margin-top: 1px;
+  }
+}
 
 /* === FIM DO FICHEIRO style.css === */
