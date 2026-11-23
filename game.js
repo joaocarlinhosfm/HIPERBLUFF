@@ -406,7 +406,6 @@ async function removePlayerFromRoomTx(code, targetPlayerId, reason = "saiu da me
 
       delete prevPresence[targetPlayerId];
 
-      // Mesas vitalícias NUNCA são apagadas da base de dados — ficam vazias em WAITING
       if (next.players.length === 0) {
         if (next.permanent || permCfg) {
           next.permanent = true;
@@ -855,18 +854,37 @@ function renderGame() {
   wasMyTurn = isMyTurn;
   $("action-bar")?.classList.toggle("disabled", !isMyTurn);
 
+  const promptEl = $("turn-prompt-banner");
   if (isMyTurn) {
     const toCall = Math.max(0, roomState.currentBet - me.bet), callAmt = Math.min(toCall, me.chips);
+    const callAmtStr = callAmt.toLocaleString("pt-PT");
     if ($("btn-check-call")) {
       $("btn-check-call").textContent = toCall === 0
         ? "Check"
-        : (callAmt >= me.chips ? `Call All-In (${callAmt.toLocaleString("pt-PT")}€)` : `Call ${callAmt.toLocaleString("pt-PT")}€`);
+        : (callAmt >= me.chips ? `Call All-In (${callAmtStr}€)` : `Call ${callAmtStr}€`);
     }
     const maxR = me.bet + me.chips, canR = me.chips > toCall, minR = Math.min(maxR, roomState.currentBet + roomState.minRaise);
     const slider = $("raise-slider");
     if (slider) slider.disabled = !canR;
     if ($("btn-raise")) $("btn-raise").disabled = !canR;
     $("raise-row")?.classList.toggle("disabled-raise", !canR);
+
+    if (promptEl) {
+      let actionPromptHTML = "";
+      if (toCall === 0) {
+        actionPromptHTML = canR
+          ? `<strong>PASSAR</strong> ou <strong>APOSTAR</strong>?`
+          : `<strong>PASSAR</strong> (CHECK)`;
+      } else if (canR) {
+        actionPromptHTML = `<strong>CALL ${callAmtStr}€</strong> ou <strong>RAISE</strong>?`;
+      } else if (callAmt >= me.chips) {
+        actionPromptHTML = `<strong>ALL-IN (${callAmtStr}€)</strong> ou <strong>FOLD</strong>?`;
+      } else {
+        actionPromptHTML = `<strong>CALL ${callAmtStr}€</strong> ou <strong>FOLD</strong>?`;
+      }
+      promptEl.innerHTML = `<span class="prompt-kicker">A TUA VEZ</span><span class="prompt-action-text">${actionPromptHTML}</span>`;
+      promptEl.classList.remove("hidden");
+    }
 
     const turnKey = `${roomState.phase}_${roomState.turnDeadline}_${roomState.currentBet}`;
     if (slider && lastSliderTurnKey !== turnKey) {
@@ -876,6 +894,8 @@ function renderGame() {
       slider.min = minR; slider.max = maxR; slider.value = minR;
       if ($("raise-value")) $("raise-value").textContent = minR.toLocaleString("pt-PT");
     }
+  } else if (promptEl) {
+    promptEl.classList.add("hidden");
   }
 
   settleHandBalanceIfNeeded(false);
