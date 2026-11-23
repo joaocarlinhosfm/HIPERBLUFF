@@ -1,14 +1,10 @@
 :root {
-  --bg-dark: #071321;
-  --panel: #102033;
   --panel-border: #243b55;
   --felt-center: #157347;
   --felt-mid: #0e5233;
   --felt-edge: #072b1a;
-  --rail-outer: #26160e;
   --rail-inner: #593823;
   --gold: #f5b942;
-  --ice-bright: #e0f2fe;
   --ice-cyan: #38bdf8;
   --ice-border: rgba(125, 211, 252, 0.35);
   --text-main: #f1f5f9;
@@ -138,22 +134,7 @@ body {
   margin-bottom: 1.25rem;
 }
 
-/* ================= LOBBY HORIZONTAL (TEMA FRIO / GLACIAL) ================= */
-#lobby-screen {
-  position: relative;
-  align-items: center;
-  justify-content: center;
-  padding:
-    max(0.75rem, env(safe-area-inset-top))
-    max(1.2rem, env(safe-area-inset-right))
-    max(0.75rem, env(safe-area-inset-bottom))
-    max(1.2rem, env(safe-area-inset-left));
-  background:
-    radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.22), transparent 45%),
-    radial-gradient(circle at 82% 80%, rgba(14, 165, 233, 0.18), transparent 45%),
-    radial-gradient(circle at 50% 0%, #102b4a 0%, #071321 62%, #030912 100%);
-}
-
+/* ================= NEVE E CARTÃO DE LOGIN (TEMA GLACIAL) ================= */
 .snow-layer {
   position: fixed;
   inset: 0;
@@ -250,7 +231,7 @@ body {
 .brand-suit.ice { color: #38bdf8; }
 .subtitle { color: #93c5fd; font-size: 0.86rem; margin-top: 0.35rem; letter-spacing: 0.4px; }
 
-/* ================= AUTENTICAÇÃO, INPUTS E CARTEIRA ================= */
+/* ================= AUTENTICAÇÃO E INPUTS ================= */
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -327,59 +308,6 @@ input[type="password"]:focus {
 .auth-hint { margin-top: 0.45rem; font-size: 0.74rem; color: #7dd3fc; }
 .error-msg { color: #fda4af; font-size: 0.8rem; margin-top: 0.55rem; min-height: 1.05rem; }
 
-.user-profile-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6rem;
-  background: rgba(4, 15, 30, 0.84);
-  border: 1px solid rgba(125, 211, 252, 0.3);
-  border-radius: 14px;
-  padding: 0.55rem 0.75rem;
-  margin-bottom: 0.75rem;
-  text-align: left;
-}
-
-.user-profile-info { display: flex; flex-direction: column; min-width: 0; }
-.profile-username { font-weight: 800; font-size: 0.94rem; color: #f0f9ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.profile-stats { font-size: 0.68rem; color: #93c5fd; }
-.user-profile-right { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; }
-
-.profile-balance {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
-  border: 1.5px solid rgba(245, 185, 66, 0.75);
-  color: var(--gold);
-  font-weight: 900;
-  font-size: 0.86rem;
-  padding: 0.24rem 0.68rem;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.join-row { display: flex; gap: 0.55rem; }
-.join-row input { text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: 700; }
-
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 0.75rem 0;
-  color: #7dd3fc;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  opacity: 0.8;
-}
-
-.divider::before,
-.divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.35), transparent);
-}
-
-.divider span { padding: 0 0.65rem; }
-
 /* ================= BOTÕES ================= */
 .btn {
   border: none;
@@ -403,11 +331,9 @@ input[type="password"]:focus {
   box-shadow: 0 6px 20px rgba(14, 165, 233, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
-.btn-secondary { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); border: 1px solid rgba(147, 197, 253, 0.35); min-width: 100px; }
 .btn-outline { background: rgba(14, 37, 64, 0.55); border: 1px solid rgba(125, 211, 252, 0.32); color: #e0f2fe; width: 100%; }
 .btn-danger { background: linear-gradient(180deg, #ef4444, #b91c1c); box-shadow: 0 4px 14px rgba(185, 28, 28, 0.4); }
 .btn-rebuy { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); color: #111827; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4); }
-.btn-install { margin-top: 0.55rem; width: 100%; background: linear-gradient(135deg, #0d9488, #0f766e); border: 1px solid rgba(94, 234, 212, 0.35); color: #f0fdfa; }
 .btn-sm { padding: 0.42rem 0.85rem; font-size: 0.82rem; width: auto; }
 .btn-icon { background: #132842; border: 1px solid var(--panel-border); padding: 0.36rem 0.6rem; font-size: 0.9rem; line-height: 1; }
 
@@ -610,20 +536,6 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   padding: 0.2rem 0.82rem;
   border-radius: 999px;
   white-space: nowrap;
-}
-
-.waiting-room-pill {
-  margin-top: 5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: rgba(10, 26, 46, 0.94);
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  color: #bae6fd;
-  font-size: 0.72rem;
-  padding: 0.18rem 0.62rem;
-  border-radius: 999px;
-  pointer-events: auto;
 }
 
 .table-center { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; z-index: 5; margin-top: 0.4rem; position: relative; }
@@ -892,7 +804,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
 .btn-raise { background: linear-gradient(180deg, #3b82f6, #1d4ed8); min-width: 102px; }
 .btn-allin { background: linear-gradient(180deg, #8b5cf6, #6d28d9); }
 
-/* ================= MODAL IOS ================= */
+/* ================= MODAIS BASE ================= */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(3, 10, 20, 0.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 100; }
 .modal-box { background: linear-gradient(165deg, #102742, #081526); border: 1.5px solid var(--ice-cyan); border-radius: 18px; padding: 1.4rem; max-width: 380px; width: 100%; text-align: center; }
 .modal-box h3 { color: #bae6fd; margin-bottom: 0.9rem; }
@@ -911,12 +823,7 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   .form-group label { font-size: 0.72rem; margin-bottom: 0.18rem; }
   input[type="text"], input[type="password"] { padding: 0.46rem 0.72rem; font-size: 0.86rem; }
   #auth-pin { font-size: 1rem; letter-spacing: 0.45rem; }
-  .divider { margin: 0.45rem 0; font-size: 0.64rem; }
   .lobby-form-col .btn { padding: 0.48rem 0.85rem; font-size: 0.82rem; }
-  .user-profile-bar { padding: 0.4rem 0.6rem; margin-bottom: 0.5rem; }
-  .profile-username { font-size: 0.82rem; }
-  .profile-stats { font-size: 0.62rem; }
-  .profile-balance { font-size: 0.76rem; padding: 0.18rem 0.52rem; }
   .error-msg { margin-top: 0.3rem; font-size: 0.72rem; min-height: 0.85rem; }
 
   .top-bar { padding: max(0.2rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.2rem max(0.75rem, env(safe-area-inset-left)); min-height: 34px; }
@@ -949,7 +856,6 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   .dealer-plate { margin-top: -8px; padding: 0.08rem 0.55rem; }
   .dealer-tag, .next-hand-pill { font-size: 0.54rem; }
   .dealer-speech { margin-top: 2px; font-size: 0.6rem; padding: 0.1rem 0.58rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
-  .waiting-room-pill { margin-top: 3px; font-size: 0.62rem; padding: 0.1rem 0.5rem; }
 
   .table-center { gap: 0.22rem; margin-top: 0.55rem; }
   .pot-zone { min-height: 20px; gap: 0.4rem; }
@@ -1126,131 +1032,131 @@ body.is-fullscreen #game-screen #btn-leave { border-radius: 999px; padding: 0.34
   animation: avPopBounce 0.65s ease-in-out infinite;
 }
 
-/* 2. Tubarão (dentada + reflexo nos óculos) */
+/* 2. Tubarão */
 .seat.is-winner [data-avatar="shark"] .av-body { transform-origin: 50% 60%; animation: avSharkLunge 0.8s ease-in-out infinite; }
 .seat.is-winner [data-avatar="shark"] .av-mouth { transform-origin: 50% 72%; animation: avSharkChomp 0.42s ease-in-out infinite; }
 .seat.is-winner [data-avatar="shark"] .av-glint { animation: avFlashBright 0.7s ease-in-out infinite; }
 
-/* 3. Lobo Gelo (olhos ciano acesos + orelhas alerta) */
+/* 3. Lobo Gelo */
 .seat.is-winner [data-avatar="wolf"] .av-eyes { animation: avIceEyes 0.65s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="wolf"] .av-ears { transform-origin: 50% 42%; animation: avEarPerk 0.8s ease-in-out infinite; }
 .seat.is-winner [data-avatar="wolf"] .av-head { transform-origin: 50% 58%; animation: avSubtleNod 1s ease-in-out infinite; }
 
-/* 4. Poker Pro (aceno confiante + brilho verde nos óculos) */
+/* 4. Poker Pro */
 .seat.is-winner [data-avatar="pro"] .av-head { transform-origin: 50% 60%; animation: avCoolNod 0.9s ease-in-out infinite; }
 .seat.is-winner [data-avatar="pro"] .av-glint { animation: avFlashBright 0.6s ease-in-out infinite; }
 
-/* 5. Rei (coroa a levitar + joias a cintilar) */
+/* 5. Rei */
 .seat.is-winner [data-avatar="king"] .av-crown { transform-origin: 50% 55%; animation: avCrownFloat 0.95s ease-in-out infinite; }
 .seat.is-winner [data-avatar="king"] .av-gems { animation: avGemTwinkle 0.55s ease-in-out infinite alternate; }
 
-/* 6. Rainha (tiara majestosa + coração a pulsar) */
+/* 6. Rainha */
 .seat.is-winner [data-avatar="queen"] .av-crown { transform-origin: 50% 55%; animation: avCrownFloat 0.95s ease-in-out infinite; }
 .seat.is-winner [data-avatar="queen"] .av-gems { animation: avGemTwinkle 0.55s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="queen"] .av-heart { transform-origin: 50% 54%; animation: avHeartBeat 0.7s ease-in-out infinite; }
 
-/* 7. Joker (salto travesso + guizos) */
+/* 7. Joker */
 .seat.is-winner [data-avatar="joker"] .av-joker { transform-origin: 50% 60%; animation: avJokerBounce 0.62s ease-in-out infinite; }
 .seat.is-winner [data-avatar="joker"] .av-bells { animation: avFlashBright 0.4s ease-in-out infinite; }
 
-/* 8. Cowboy (chapéu a cumprimentar + estrela a rodar) */
+/* 8. Cowboy */
 .seat.is-winner [data-avatar="cowboy"] .av-hat { transform-origin: 50% 38%; animation: avHatTip 0.9s ease-in-out infinite; }
 .seat.is-winner [data-avatar="cowboy"] .av-star { transform-origin: 50% 72%; animation: avSpinSlow 1.6s linear infinite; }
 
-/* 9. Raposa (orelhas alternadas + abano de cabeça) */
+/* 9. Raposa */
 .seat.is-winner [data-avatar="fox"] .av-head { transform-origin: 50% 60%; animation: avFoxWiggle 0.9s ease-in-out infinite; }
 .seat.is-winner [data-avatar="fox"] .av-ear-l { transform-origin: 34% 38%; animation: avEarWigL 0.6s ease-in-out infinite; }
 .seat.is-winner [data-avatar="fox"] .av-ear-r { transform-origin: 66% 38%; animation: avEarWigR 0.6s ease-in-out infinite; }
 
-/* 10. Cyber (antena a piscar + scanner no visor) */
+/* 10. Cyber */
 .seat.is-winner [data-avatar="cyber"] .av-beacon { animation: avBeaconBlink 0.4s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="cyber"] .av-visor { animation: avVisorScan 0.75s ease-in-out infinite alternate; }
 
-/* 11. VIP (diamante radiante + estrelas a rodar) */
+/* 11. VIP */
 .seat.is-winner [data-avatar="vip"] .av-diamond { transform-origin: 50% 52%; animation: avDiamondFloat 0.9s ease-in-out infinite; }
 .seat.is-winner [data-avatar="vip"] .av-star-l { transform-origin: 20% 31%; animation: avStarSpin 1.1s linear infinite; }
 .seat.is-winner [data-avatar="vip"] .av-star-r { transform-origin: 80% 23.5%; animation: avStarSpin 1.1s linear infinite reverse; }
 
-/* 12. Gato (olhos dourados + laço saltitante + orelhas) */
+/* 12. Gato */
 .seat.is-winner [data-avatar="cat"] .av-eyes { transform-origin: 50% 51%; animation: avCatBlink 1.3s ease-in-out infinite; }
 .seat.is-winner [data-avatar="cat"] .av-bowtie { transform-origin: 50% 82%; animation: avBowBounce 0.55s ease-in-out infinite; }
 .seat.is-winner [data-avatar="cat"] .av-ears { transform-origin: 50% 42%; animation: avEarPerk 0.75s ease-in-out infinite; }
 
-/* 13. Pressostato KP (agulha em alta pressão + LED + vibração) */
+/* 13. Pressostato KP */
 .seat.is-winner [data-avatar="kp"] .av-box { transform-origin: 50% 50%; animation: avMicroRumble 0.22s linear infinite; }
 .seat.is-winner [data-avatar="kp"] .av-needle { animation: avKpNeedle 0.55s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="kp"] .av-led { animation: avRedStrobe 0.35s ease-in-out infinite alternate; }
 
-/* 14. Filtro DML (seta de fluxo rápida + brilho metálico) */
+/* 14. Filtro DML */
 .seat.is-winner [data-avatar="dml"] .av-filter { transform-origin: 50% 50%; animation: avSubtlePulse 0.9s ease-in-out infinite; }
 .seat.is-winner [data-avatar="dml"] .av-flow { animation: avDmlFlow 0.65s ease-in-out infinite; }
 .seat.is-winner [data-avatar="dml"] .av-shine { animation: avFlashBright 0.8s ease-in-out infinite; }
 
-/* 15. Válvula T2 (bolbo a brilhar + diafragma + parafuso a girar) */
+/* 15. Válvula T2 */
 .seat.is-winner [data-avatar="txv"] .av-bulb { animation: avWarmGlow 0.6s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="txv"] .av-cap { transform-origin: 46% 32%; animation: avCapPulse 0.6s ease-in-out infinite; }
 .seat.is-winner [data-avatar="txv"] .av-screw { transform-origin: 46% 56%; animation: avSpinSlow 1.2s linear infinite; }
 
-/* 16. Visor DRY (verde neon pulsante + anel sextavado a rodar) */
+/* 16. Visor DRY */
 .seat.is-winner [data-avatar="sightglass"] .av-hex { transform-origin: 50% 50%; animation: avSpinSlow 4.5s linear infinite; }
 .seat.is-winner [data-avatar="sightglass"] .av-dry { transform-origin: 50% 50%; animation: avDryPulse 0.65s ease-in-out infinite alternate; }
 
-/* 17. Compressor Bitzer (arranque do motor + visor de óleo + LED) */
+/* 17. Compressor Bitzer */
 .seat.is-winner [data-avatar="bitzer"] .av-motor { transform-origin: 50% 68%; animation: avEngineRumble 0.18s linear infinite; }
 .seat.is-winner [data-avatar="bitzer"] .av-oil { animation: avFlashBright 0.5s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="bitzer"] .av-led { animation: avGreenBlink 0.45s ease-in-out infinite alternate; }
 
-/* 18. Ventilador (pás em alta rotação + anel de gelo) */
+/* 18. Ventilador */
 .seat.is-winner [data-avatar="fan"] .av-blades { transform-origin: 50% 50%; animation: avFanSpin 0.42s linear infinite; }
 .seat.is-winner [data-avatar="fan"] .av-ring { animation: avIceRing 0.7s ease-in-out infinite alternate; }
 
-/* 19. Digital 550s (ecrã a piscar + manípulos a rodar) */
+/* 19. Digital 550s */
 .seat.is-winner [data-avatar="testo"] .av-screen { animation: avLcdPulse 0.55s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="testo"] .av-knob-l { transform-origin: 38% 60%; animation: avKnobTurn 0.8s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="testo"] .av-knob-r { transform-origin: 62% 60%; animation: avKnobTurn 0.8s ease-in-out infinite alternate-reverse; }
 
-/* 20. Manifold (ponteiros azul e vermelho no máximo) */
+/* 20. Manifold */
 .seat.is-winner [data-avatar="manifold"] .av-needle-l { transform-origin: 34% 36%; animation: avGaugeSweepL 0.65s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="manifold"] .av-needle-r { transform-origin: 66% 36%; animation: avGaugeSweepR 0.65s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="manifold"] .av-hoses { animation: avFlashBright 0.65s ease-in-out infinite alternate; }
 
-/* 21. Bomba Vácuo (vibração de sucção + visor de óleo) */
+/* 21. Bomba Vácuo */
 .seat.is-winner [data-avatar="vacuum"] .av-pump { transform-origin: 50% 72%; animation: avEngineRumble 0.2s linear infinite; }
 .seat.is-winner [data-avatar="vacuum"] .av-oil { transform-origin: 32% 58%; animation: avOilBubble 0.45s ease-in-out infinite alternate; }
 
-/* 22. Cobre & Corte (corta-tubos a girar à volta do cobre) */
+/* 22. Cobre & Corte */
 .seat.is-winner [data-avatar="copper"] .av-cutter { transform-origin: 48% 54%; animation: avSpinSlow 1.6s linear infinite; }
 .seat.is-winner [data-avatar="copper"] .av-coil { animation: avWarmGlow 0.8s ease-in-out infinite alternate; }
 
-/* 23. Maçarico (chama rugindo + faíscas + cobre incandescente) */
+/* 23. Maçarico */
 .seat.is-winner [data-avatar="torch"] .av-flame { transform-origin: 44% 56%; animation: avFlameRoar 0.22s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="torch"] .av-glow { transform-origin: 64% 52%; animation: avHotGlow 0.35s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="torch"] .av-sparks { transform-origin: 64% 50%; animation: avSparksPop 0.55s ease-out infinite; }
 
-/* 24. Garrafa CO2 (vibração de alta pressão + nuvem de gelo seco) */
+/* 24. Garrafa CO2 */
 .seat.is-winner [data-avatar="co2"] .av-tank { transform-origin: 50% 78%; animation: avTankShake 0.45s ease-in-out infinite; }
 .seat.is-winner [data-avatar="co2"] .av-mist { transform-origin: 50% 82%; animation: avMistBillow 0.9s ease-in-out infinite alternate; }
 
-/* 25. Garrafa R32 (salto de festejo + floco de neve a girar) */
+/* 25. Garrafa R32 */
 .seat.is-winner [data-avatar="gas"] .av-tank { transform-origin: 50% 80%; animation: avTankHop 0.7s ease-in-out infinite; }
 .seat.is-winner [data-avatar="gas"] .av-flake { transform-origin: 50% 73%; animation: avSpinSlow 1.1s linear infinite; }
 
-/* 26. Alarme HP (sirene strobe + raios de alerta) */
+/* 26. Alarme HP */
 .seat.is-winner [data-avatar="hptrip"] .av-dome { animation: avRedStrobe 0.32s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="hptrip"] .av-rays { transform-origin: 50% 45%; animation: avRaysPulse 0.38s ease-in-out infinite alternate; }
 
-/* 27. Termóstato -25°C (LED a piscar + indicadores alternados) */
+/* 27. Termóstato -25°C */
 .seat.is-winner [data-avatar="thermo"] .av-temp { animation: avTempBlink 0.48s steps(2, start) infinite; }
 .seat.is-winner [data-avatar="thermo"] .av-dot-a { animation: avIceEyes 0.45s ease-in-out infinite alternate; }
 .seat.is-winner [data-avatar="thermo"] .av-dot-b { animation: avGreenBlink 0.45s ease-in-out infinite alternate-reverse; }
 .seat.is-winner [data-avatar="thermo"] .av-btn { animation: avRedStrobe 0.55s ease-in-out infinite alternate; }
 
-/* 28. Técnico (salto alegre + óculos e manómetros a brilhar) */
+/* 28. Técnico */
 .seat.is-winner [data-avatar="tech"] .av-body { transform-origin: 50% 88%; animation: avTechJump 0.65s ease-in-out infinite; }
 .seat.is-winner [data-avatar="tech"] .av-glasses { animation: avFlashBright 0.7s ease-in-out infinite; }
 .seat.is-winner [data-avatar="tech"] .av-gauges { animation: avPopBounce 0.65s ease-in-out infinite; }
 
-/* 29. Pinguim (salto festivo + chave inglesa a abanar) */
+/* 29. Pinguim */
 .seat.is-winner [data-avatar="penguin"] .av-body { transform-origin: 50% 86%; animation: avPenguinWaddle 0.65s ease-in-out infinite; }
 .seat.is-winner [data-avatar="penguin"] .av-wrench { transform-origin: 73% 74%; animation: avWrenchWave 0.38s ease-in-out infinite alternate; }
 
